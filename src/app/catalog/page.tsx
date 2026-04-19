@@ -271,16 +271,19 @@ export default function CatalogPage() {
         imageUrl = await uploadImage(editImageFile, `catalog/${Date.now()}_${editImageFile.name}`);
       }
 
-      await updateCatalogItem(selectedItem.id, {
+      const payload: any = {
         name: editName.trim(),
         material: editMaterial,
         weight_grams: weight,
-        // Limpa o array legado ao salvar
-        required_filaments: undefined as any,
         time_minutes: totalTime,
         calculated_price: costCalc.batchSuggestedPrice,
-        ...(imageUrl && { imageUrl }),
-      });
+      };
+
+      if (imageUrl) {
+        payload.imageUrl = imageUrl;
+      }
+
+      await updateCatalogItem(selectedItem.id, payload);
 
       setEditDialogOpen(false);
       loadItems();
