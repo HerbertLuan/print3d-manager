@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calculator, BookOpen, ClipboardList, Printer, Menu, PackageOpen, Tag, Receipt, Database, LayoutDashboard } from "lucide-react";
+import { Calculator, BookOpen, ClipboardList, Printer, Menu, PackageOpen, Tag, LayoutDashboard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -40,22 +40,10 @@ const navItems = [
     description: "Pronta entrega",
   },
   {
-    href: "/filaments",
-    label: "Filamentos",
-    icon: Database,
-    description: "Gestão Físicas das bobinas",
-  },
-  {
     href: "/supplies",
     label: "Insumos",
     icon: Tag,
     description: "Argolas, tags NFC…",
-  },
-  {
-    href: "/expenses",
-    label: "Despesas",
-    icon: Receipt,
-    description: "Custos operacionais",
   },
 ];
 

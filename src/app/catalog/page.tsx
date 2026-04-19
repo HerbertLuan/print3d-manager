@@ -13,14 +13,11 @@ import {
   Trash2,
   Sparkles,
   Tag,
-  Layers,
   Edit2,
-  Plus
 } from "lucide-react";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -49,14 +46,14 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { getCatalogItems, addOrder, deleteCatalogItem, getSupplies, getFilaments, updateCatalogItem } from "@/lib/firestore";
-import { CatalogItem, Supply, SelectedSupply, Filament, CatalogFilamentRequirement } from "@/lib/types";
+import { getCatalogItems, addOrder, deleteCatalogItem, getSupplies, updateCatalogItem } from "@/lib/firestore";
+import { CatalogItem, Supply, SelectedSupply } from "@/lib/types";
 import {
   formatBRL,
   formatTime,
   calculateBatchTimeAndCost,
   DEFAULT_PROFIT_MARGIN,
-  MATERIAL_OPTIONS
+  MATERIAL_OPTIONS,
 } from "@/lib/calculations";
 import { uploadImage } from "@/lib/storage";
 
@@ -67,8 +64,19 @@ const MATERIAL_COLORS: Record<string, string> = {
   ABS: "bg-orange-500/10 text-orange-400 border-orange-500/20",
   ASA: "bg-purple-500/10 text-purple-400 border-purple-500/20",
   TPU: "bg-green-500/10 text-green-400 border-green-500/20",
-  "Múltiplos": "bg-pink-500/10 text-pink-400 border-pink-500/20",
 };
+
+/** Normaliza um item do catálogo para o modelo simples de 1 material.
+ *  Fallback seguro: se o banco tiver required_filaments[], usa o primeiro.
+ *  Nunca quebra a UI independente do formato salvo no Firestore.
+ */
+function normalizeItem(item: CatalogItem): { material: string; weight_grams: number } {
+  const rf = item.required_filaments;
+  if (Array.isArray(rf) && rf.length > 0) {
+    return { material: rf[0].material ?? "PLA", weight_grams: rf[0].weight_grams ?? 0 };
+  }
+  return { material: item.material ?? "PLA", weight_grams: item.weight_grams ?? 0 };
+}
 
 export default function CatalogPage() {
   const [items, setItems] = useState<CatalogItem[]>([]);
@@ -76,7 +84,6 @@ export default function CatalogPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [availableSupplies, setAvailableSupplies] = useState<Supply[]>([]);
-  const [availableFilaments, setAvailableFilaments] = useState<Filament[]>([]);
 
   // Order state
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
@@ -85,7 +92,6 @@ export default function CatalogPage() {
   const [orderQuantity, setOrderQuantity] = useState("1");
   const [orderPrice, setOrderPrice] = useState("");
   const [selectedSupplies, setSelectedSupplies] = useState<Record<string, number>>({});
-  const [mappedFilaments, setMappedFilaments] = useState<Record<number, string>>({}); // index -> filament_id
 
   const [ordering, setOrdering] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
@@ -94,23 +100,22 @@ export default function CatalogPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editName, setEditName] = useState("");
+  const [editMaterial, setEditMaterial] = useState("PLA");
+  const [editWeight, setEditWeight] = useState("");
   const [editTimeHours, setEditTimeHours] = useState("");
   const [editTimeMinutes, setEditTimeMinutes] = useState("");
-  const [editFilaments, setEditFilaments] = useState<(CatalogFilamentRequirement & { id: string })[]>([]);
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
 
   const loadItems = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [catalogData, suppliesData, filamentsData] = await Promise.all([
+      const [catalogData, suppliesData] = await Promise.all([
         getCatalogItems(),
         getSupplies(),
-        getFilaments(),
       ]);
       setItems(catalogData);
       setAvailableSupplies(suppliesData);
-      setAvailableFilaments(filamentsData);
     } catch (err) {
       console.error(err);
       setError("Erro ao carregar os dados.");
@@ -121,28 +126,33 @@ export default function CatalogPage() {
 
   useEffect(() => { loadItems(); }, [loadItems]);
 
-  function normalizeItem(item: CatalogItem) {
-    const filaments = item.required_filaments || [{ material: item.material || "PLA", weight_grams: item.weight_grams || 0 }];
-    const totalWeight = filaments.reduce((acc, f) => acc + f.weight_grams, 0);
-    return { filaments, totalWeight };
-  }
-
   function openOrderDialog(item: CatalogItem) {
+    const norm = normalizeItem(item);
+    const qty = 1;
+    const batch = calculateBatchTimeAndCost({
+      unitTimeMinutes: item.time_minutes,
+      quantity: qty,
+      unitFilaments: [norm],
+      profitMarginPercent: DEFAULT_PROFIT_MARGIN * 100,
+    });
+    const suggested = batch.batchSuggestedPrice;
+
     setSelectedItem(item);
     setOrderQuantity("1");
     setSelectedSupplies({});
-    setMappedFilaments({});
     setInstagramHandle("");
+    setOrderPrice(suggested.toFixed(2));
     setOrderDialogOpen(true);
   }
 
   function openEditDialog(item: CatalogItem) {
-    setSelectedItem(item);
     const norm = normalizeItem(item);
+    setSelectedItem(item);
     setEditName(item.name);
+    setEditMaterial(norm.material);
+    setEditWeight(norm.weight_grams.toString());
     setEditTimeHours(Math.floor(item.time_minutes / 60).toString());
     setEditTimeMinutes((item.time_minutes % 60).toString());
-    setEditFilaments(norm.filaments.map(f => ({ ...f, id: Math.random().toString() })));
     setEditImageFile(null);
     setEditDialogOpen(true);
   }
@@ -155,7 +165,7 @@ export default function CatalogPage() {
     const batch = calculateBatchTimeAndCost({
       unitTimeMinutes: selectedItem.time_minutes,
       quantity: qty,
-      unitFilaments: norm.filaments,
+      unitFilaments: [norm],
       profitMarginPercent: DEFAULT_PROFIT_MARGIN * 100,
     });
 
@@ -165,26 +175,18 @@ export default function CatalogPage() {
     }, 0);
 
     const totalCostWithSupplies = batch.batchTotalBaseCost + suppliesCostTotal;
-    const finalSuggestedPrice = totalCostWithSupplies / (1 - batch.profitMargin);
-    const grossMarginOnCurrentPrice = parseFloat(orderPrice)
-      ? ((parseFloat(orderPrice) - totalCostWithSupplies) / parseFloat(orderPrice)) * 100
+    const salePrice = parseFloat(orderPrice) || 0;
+    const grossMarginPercent = salePrice > 0
+      ? ((salePrice - totalCostWithSupplies) / salePrice) * 100
       : 0;
 
     return {
       ...batch,
       suppliesCostTotal,
       totalCostWithSupplies,
-      finalSuggestedPrice,
-      grossMarginOnCurrentPrice,
-      totalWeightGrams: norm.totalWeight * qty,
+      grossMarginPercent,
     };
   }, [selectedItem, orderQuantity, selectedSupplies, availableSupplies, orderPrice]);
-
-  useEffect(() => {
-    if (batchStats && !orderPrice) {
-      setOrderPrice(batchStats.finalSuggestedPrice.toFixed(2));
-    }
-  }, [batchStats]);
 
   async function handleCreateOrder() {
     if (!selectedItem || !instagramHandle.trim()) return;
@@ -200,21 +202,18 @@ export default function CatalogPage() {
           return s ? { supplyId: id, name: s.name, unit_cost: s.unit_cost, quantity: sq } : null;
         }).filter(Boolean) as SelectedSupply[];
 
-      const usedFilaments = Object.entries(mappedFilaments).map(([indexStr, filamentId]) => {
-        const req = norm.filaments[parseInt(indexStr)];
-        return { filament_id: filamentId, weight_grams: req.weight_grams * qty };
-      });
+      const salePrice = parseFloat(orderPrice) || batchStats?.batchSuggestedPrice || selectedItem.calculated_price;
 
       const orderPayload: Parameters<typeof addOrder>[0] = {
         instagram_handle: `@${handle}`,
         catalog_item_id: selectedItem.id,
         piece_name: selectedItem.name,
-        material: norm.filaments.length > 1 ? "Múltiplos" : norm.filaments[0].material,
+        material: norm.material,
         quantity: qty,
-        price: parseFloat(orderPrice) || batchStats?.finalSuggestedPrice || selectedItem.calculated_price,
+        price: salePrice,
         payment_status: "Pendente",
         production_status: "Na Fila",
-        used_filaments: usedFilaments,
+        used_filaments: [],
         filaments_deducted: false,
       };
 
@@ -245,15 +244,13 @@ export default function CatalogPage() {
       const min = parseInt(editTimeMinutes) || 0;
       const hr = parseInt(editTimeHours) || 0;
       const totalTime = hr * 60 + min;
-
-      const newFilaments = editFilaments.map(f => ({ material: f.material, weight_grams: f.weight_grams, color: f.color }));
-      const totalWeight = newFilaments.reduce((a, b) => a + b.weight_grams, 0);
+      const weight = parseFloat(editWeight) || 0;
 
       const costCalc = calculateBatchTimeAndCost({
         unitTimeMinutes: totalTime,
         quantity: 1,
-        unitFilaments: newFilaments,
-        profitMarginPercent: DEFAULT_PROFIT_MARGIN * 100
+        unitFilaments: [{ material: editMaterial, weight_grams: weight }],
+        profitMarginPercent: DEFAULT_PROFIT_MARGIN * 100,
       });
 
       let imageUrl = selectedItem.imageUrl;
@@ -263,9 +260,10 @@ export default function CatalogPage() {
 
       await updateCatalogItem(selectedItem.id, {
         name: editName.trim(),
-        required_filaments: newFilaments,
-        weight_grams: totalWeight,
-        material: newFilaments.length > 1 ? "Múltiplos" : newFilaments[0].material,
+        material: editMaterial,
+        weight_grams: weight,
+        // Limpa o array legado ao salvar
+        required_filaments: undefined as any,
         time_minutes: totalTime,
         calculated_price: costCalc.batchSuggestedPrice,
         ...(imageUrl && { imageUrl }),
@@ -322,7 +320,7 @@ export default function CatalogPage() {
 
         {loading && (
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-             {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-64 bg-muted animate-pulse rounded-xl" />)}
+            {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-64 bg-muted animate-pulse rounded-xl" />)}
           </div>
         )}
 
@@ -339,8 +337,19 @@ export default function CatalogPage() {
             ))}
           </div>
         )}
+
+        {!loading && !error && items.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-24 text-center px-4">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+              <Package className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium text-foreground mb-2">Catálogo vazio</h3>
+            <p className="text-muted-foreground max-w-sm">Use a Calculadora para criar e salvar peças no catálogo.</p>
+          </div>
+        )}
       </div>
 
+      {/* ── Modal: Gerar Pedido ── */}
       <ResponsiveModal
         open={orderDialogOpen}
         onOpenChange={setOrderDialogOpen}
@@ -358,34 +367,6 @@ export default function CatalogPage() {
             <Input type="number" min={1} value={orderQuantity} onChange={(e) => setOrderQuantity(e.target.value)} />
           </div>
 
-          {selectedItem && normalizeItem(selectedItem).filaments.length > 0 && (
-             <div className="space-y-3">
-               <Label className="flex items-center gap-2">
-                 <Layers className="w-4 h-4" /> Selecione os Rolos do Estoque (Rateio de Consumo)
-               </Label>
-               {normalizeItem(selectedItem).filaments.map((req, idx) => (
-                  <div key={idx} className="bg-muted/30 border border-border p-3 rounded-lg space-y-2">
-                     <p className="text-sm font-medium">{req.color || "Cor Principal"} - {req.material} <span className="text-muted-foreground">({req.weight_grams * parseInt(orderQuantity || "1")}g total)</span></p>
-                     <Select value={mappedFilaments[idx]} onValueChange={(v) => setMappedFilaments(p => ({...p, [idx]: v || ""}))}>
-                        <SelectTrigger>
-                           <SelectValue placeholder="Selecione um rolo físico..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                           {availableFilaments.filter(f => f.material === req.material).map(f => (
-                              <SelectItem key={f.id} value={f.id}>
-                                 {f.name} ({f.color_name}) - Restam {Math.max(0, f.initial_weight_grams - f.consumed_weight_grams)}g
-                              </SelectItem>
-                           ))}
-                           {availableFilaments.filter(f => f.material === req.material).length === 0 && (
-                             <SelectItem value="none" disabled>Nenhum rolo de {req.material} cadastrado.</SelectItem>
-                           )}
-                        </SelectContent>
-                     </Select>
-                  </div>
-               ))}
-             </div>
-          )}
-
           {availableSupplies.length > 0 && (
             <div className="space-y-3">
               <Label className="flex items-center gap-2"><Tag className="w-4 h-4" /> Insumos Extras</Label>
@@ -395,11 +376,11 @@ export default function CatalogPage() {
                     <Checkbox
                       id={`supply-${supply.id}`}
                       checked={selectedSupplies[supply.id] !== undefined}
-                      onCheckedChange={(c) => setSelectedSupplies(p => c ? {...p, [supply.id]: 1} : Object.fromEntries(Object.entries(p).filter(([k]) => k !== supply.id)))}
+                      onCheckedChange={(c) => setSelectedSupplies(p => c ? { ...p, [supply.id]: 1 } : Object.fromEntries(Object.entries(p).filter(([k]) => k !== supply.id)))}
                     />
                     <label htmlFor={`supply-${supply.id}`} className="flex-1 cursor-pointer text-sm font-medium">{supply.name}</label>
                     {selectedSupplies[supply.id] !== undefined && (
-                      <Input type="number" min={1} value={selectedSupplies[supply.id]} onChange={(e) => setSelectedSupplies(p => ({...p, [supply.id]: parseInt(e.target.value)||1}))} className="w-16 h-7 px-1 text-center" />
+                      <Input type="number" min={1} value={selectedSupplies[supply.id]} onChange={(e) => setSelectedSupplies(p => ({ ...p, [supply.id]: parseInt(e.target.value) || 1 }))} className="w-16 h-7 px-1 text-center" />
                     )}
                   </div>
                 ))}
@@ -407,73 +388,101 @@ export default function CatalogPage() {
             </div>
           )}
 
+          {/* Resumo de Custos */}
+          {batchStats && (
+            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5 text-sm">
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Filamento (lote)</span>
+                <span className="font-medium tabular-nums">{formatBRL(batchStats.batchTotalFilamentCost)}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-muted-foreground">Máquina (lote)</span>
+                <span className="font-medium tabular-nums">{formatBRL(batchStats.batchTotalMachineCost)}</span>
+              </div>
+              {batchStats.suppliesCostTotal > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Insumos</span>
+                  <span className="font-medium tabular-nums">{formatBRL(batchStats.suppliesCostTotal)}</span>
+                </div>
+              )}
+              <div className="border-t border-border pt-1.5 flex justify-between items-center font-semibold">
+                <span>Custo Total</span>
+                <span className="tabular-nums">{formatBRL(batchStats.totalCostWithSupplies)}</span>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
-            <Label>Preço Final a Cobrar (R$)</Label>
-            <Input type="number" step={0.01} value={orderPrice} onChange={(e) => setOrderPrice(e.target.value)} />
+            <Label className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary" />
+              Preço de Venda (R$)
+            </Label>
+            <Input
+              type="number"
+              step={0.01}
+              value={orderPrice}
+              onChange={(e) => setOrderPrice(e.target.value)}
+            />
             {batchStats && parseFloat(orderPrice) > 0 && (
-               <p className={`text-xs font-medium ${batchStats.grossMarginOnCurrentPrice < 40 ? "text-red-400" : "text-green-400"}`}>
-                 Margem Bruta (Cálculo): {batchStats.grossMarginOnCurrentPrice.toFixed(1)}%
-               </p>
+              <p className={`text-xs font-semibold ${batchStats.grossMarginPercent < 0 ? "text-red-400" : batchStats.grossMarginPercent < 40 ? "text-amber-400" : "text-green-400"}`}>
+                Margem Bruta: {batchStats.grossMarginPercent.toFixed(1)}%
+              </p>
             )}
           </div>
 
           <div className="flex flex-col-reverse sm:flex-row gap-2">
-             <Button variant="outline" className="w-full sm:w-auto" onClick={() => setOrderDialogOpen(false)}>Cancelar</Button>
-             <Button className="w-full sm:w-auto flex-1" onClick={handleCreateOrder} disabled={!instagramHandle.trim() || ordering}>
-               {ordering ? "Criando..." : "Criar Pedido"}
-             </Button>
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setOrderDialogOpen(false)}>Cancelar</Button>
+            <Button className="w-full sm:w-auto flex-1" onClick={handleCreateOrder} disabled={!instagramHandle.trim() || ordering}>
+              {ordering ? "Criando..." : "Criar Pedido"}
+            </Button>
           </div>
         </div>
       </ResponsiveModal>
 
-      <ResponsiveModal open={editDialogOpen} onOpenChange={setEditDialogOpen} title="Editar Peça" description="Altere os parâmetros físicos e foto. O preço será recalculado com a margem atual.">
+      {/* ── Modal: Editar Peça ── */}
+      <ResponsiveModal open={editDialogOpen} onOpenChange={setEditDialogOpen} title="Editar Peça" description="Altere os parâmetros. O preço sugerido será recalculado.">
         <div className="space-y-4 py-2">
-           <div className="space-y-2">
-              <Label>Nome da Peça</Label>
-              <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
-           </div>
-           
-           <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Materiais Exigidos / Partes</Label>
-                <Button variant="ghost" size="sm" onClick={() => setEditFilaments(p => [...p, {id: Math.random().toString(), material: "PLA", weight_grams: 0}])} className="h-6">
-                  <Plus className="w-3 h-3 mr-1"/> Adicionar Parâmetro
-                </Button>
-              </div>
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                 {editFilaments.map((f, i) => (
-                    <div key={f.id} className="flex gap-2">
-                       <Select value={f.material} onValueChange={(v) => setEditFilaments(p => p.map(x => x.id === f.id ? {...x, material: v || ""} : x))}>
-                          <SelectTrigger className="w-24"><SelectValue/></SelectTrigger>
-                          <SelectContent>{MATERIAL_OPTIONS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-                       </Select>
-                       <Input placeholder="Cor" className="w-24" value={f.color||""} onChange={(e) => setEditFilaments(p => p.map(x => x.id === f.id ? {...x, color: e.target.value} : x))} />
-                       <Input type="number" placeholder="0g" className="flex-1" value={f.weight_grams} onChange={(e) => setEditFilaments(p => p.map(x => x.id === f.id ? {...x, weight_grams: parseFloat(e.target.value)||0} : x))} />
-                       <Button variant="ghost" size="icon" className="text-destructive shrink-0" onClick={() => setEditFilaments(p => p.filter(x => x.id !== f.id))}><Trash2 className="w-4 h-4"/></Button>
-                    </div>
-                 ))}
-                 <p className="text-xs text-right text-muted-foreground mt-1">Peso Total Peça: {editFilaments.reduce((a, b) => a + b.weight_grams, 0)}g</p>
-              </div>
-           </div>
+          <div className="space-y-2">
+            <Label>Nome da Peça</Label>
+            <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+          </div>
 
-           <div className="space-y-2">
-              <Label>Tempo (Horas e Minutos)</Label>
-              <div className="flex gap-2">
-                 <Input type="number" value={editTimeHours} onChange={e => setEditTimeHours(e.target.value)} placeholder="0" />
-                 <Input type="number" value={editTimeMinutes} onChange={e => setEditTimeMinutes(e.target.value)} placeholder="0" max={59} />
-              </div>
-           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Material</Label>
+              <Select value={editMaterial} onValueChange={(v) => setEditMaterial(v || "PLA")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {MATERIAL_OPTIONS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Peso (gramas)</Label>
+              <Input type="number" placeholder="0" value={editWeight} onChange={(e) => setEditWeight(e.target.value)} />
+            </div>
+          </div>
 
-           <div className="space-y-2">
-              <Label>Substituir Foto</Label>
-              <ImageUpload onImageSelected={setEditImageFile} />
-              {selectedItem?.imageUrl && !editImageFile && <p className="text-xs text-muted-foreground">Deixe em branco para manter a foto atual.</p>}
-           </div>
+          <div className="space-y-2">
+            <Label>Tempo (Horas e Minutos)</Label>
+            <div className="flex gap-2">
+              <Input type="number" value={editTimeHours} onChange={e => setEditTimeHours(e.target.value)} placeholder="0h" />
+              <Input type="number" value={editTimeMinutes} onChange={e => setEditTimeMinutes(e.target.value)} placeholder="0min" max={59} />
+            </div>
+          </div>
 
-           <div className="flex gap-2 pt-4">
-              <Button variant="outline" className="flex-1" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
-              <Button className="flex-1" onClick={handleSaveEdit} disabled={savingEdit || editName.trim() === ""}>{savingEdit ? "Salvando..." : "Salvar Edição"}</Button>
-           </div>
+          <div className="space-y-2">
+            <Label>Substituir Foto</Label>
+            <ImageUpload onImageSelected={setEditImageFile} />
+            {selectedItem?.imageUrl && !editImageFile && <p className="text-xs text-muted-foreground">Deixe em branco para manter a foto atual.</p>}
+          </div>
+
+          <div className="flex gap-2 pt-4">
+            <Button variant="outline" className="flex-1" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
+            <Button className="flex-1" onClick={handleSaveEdit} disabled={savingEdit || editName.trim() === ""}>
+              {savingEdit ? "Salvando..." : "Salvar Edição"}
+            </Button>
+          </div>
         </div>
       </ResponsiveModal>
     </div>
@@ -481,10 +490,8 @@ export default function CatalogPage() {
 }
 
 function CatalogCard({ item, onOrder, onEdit, onDelete }: any) {
-  const filaments = item.required_filaments || [{ material: item.material || "PLA", weight_grams: item.weight_grams || 0 }];
-  const mainMaterial = filaments.length > 1 ? "Múltiplos" : filaments[0].material;
-  const matClass = MATERIAL_COLORS[mainMaterial] ?? "bg-muted";
-  const weight = filaments.reduce((acc: number, f: any) => acc + f.weight_grams, 0);
+  const norm = normalizeItem(item);
+  const matClass = MATERIAL_COLORS[norm.material] ?? "bg-muted";
 
   return (
     <Card className="border-border hover:border-primary/30 transition-all duration-200 hover:shadow-md group overflow-hidden flex flex-col">
@@ -501,12 +508,12 @@ function CatalogCard({ item, onOrder, onEdit, onDelete }: any) {
       )}
       <CardHeader className="pb-3 flex-1 relative">
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-background/80 backdrop-blur-sm p-1 rounded-md border border-border">
-           <Button variant="ghost" size="icon" className="h-7 w-7 text-foreground" onClick={onEdit}>
-              <Edit2 className="w-3.5 h-3.5" />
-           </Button>
+          <Button variant="ghost" size="icon" className="h-7 w-7 text-foreground" onClick={onEdit}>
+            <Edit2 className="w-3.5 h-3.5" />
+          </Button>
           <AlertDialog>
             <AlertDialogTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" />}>
-                <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-3.5 h-3.5" />
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
@@ -523,7 +530,7 @@ function CatalogCard({ item, onOrder, onEdit, onDelete }: any) {
 
         <div className="flex items-start justify-between gap-2 pr-12">
           <CardTitle className="text-base leading-tight">{item.name}</CardTitle>
-          <Badge variant="outline" className={`text-[10px] shrink-0 font-semibold ${matClass}`}>{mainMaterial}</Badge>
+          <Badge variant="outline" className={`text-[10px] shrink-0 font-semibold ${matClass}`}>{norm.material}</Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -538,8 +545,8 @@ function CatalogCard({ item, onOrder, onEdit, onDelete }: any) {
           <div className="bg-muted rounded-lg p-2.5 flex items-center gap-2">
             <Weight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
             <div>
-              <p className="text-[10px] text-muted-foreground">Peso Total</p>
-              <p className="text-xs font-medium">{weight}g</p>
+              <p className="text-[10px] text-muted-foreground">Peso</p>
+              <p className="text-xs font-medium">{norm.weight_grams}g</p>
             </div>
           </div>
         </div>

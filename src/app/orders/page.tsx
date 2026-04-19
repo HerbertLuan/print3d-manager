@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo } from "react";
-import { 
-  ClipboardList, 
-  CheckCircle2, 
-  Clock, 
+import {
+  ClipboardList,
+  CheckCircle2,
+  Clock,
   PlayCircle,
   RefreshCw,
   Search,
@@ -12,14 +12,12 @@ import {
   MoreVertical,
   Edit2,
   Trash2,
-  AlertCircle
+  Info,
 } from "lucide-react";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,25 +45,25 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ResponsiveModal } from "@/components/ui/responsive-modal";
 
-import { 
-  getOrders, 
-  updateOrderPaymentStatus, 
-  deleteOrder, 
+import {
+  getOrders,
+  updateOrderPaymentStatus,
+  deleteOrder,
   updateOrder,
-  consumeFilamentsTransaction
+  consumeFilamentsTransaction,
 } from "@/lib/firestore";
 import { Order, PaymentStatus, ProductionStatus } from "@/lib/types";
-import { formatBRL } from "@/lib/calculations";
+import { formatBRL, formatTime } from "@/lib/calculations";
 
 const STATUS_COLORS: Record<ProductionStatus, string> = {
   "Na Fila": "bg-slate-500/10 text-slate-500 border-slate-500/20",
   "Imprimindo": "bg-blue-500/10 text-blue-500 border-blue-500/20",
-  "Concluído": "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+  "Concluído": "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
 };
 
 const PAYMENT_COLORS: Record<PaymentStatus, string> = {
   "Pendente": "bg-amber-500/10 text-amber-500 border-amber-500/20",
-  "Pago": "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+  "Pago": "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
 };
 
 export default function OrdersPage() {
@@ -73,9 +71,10 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"Todos" | ProductionStatus>("Todos");
-  
+
   const [deleteOrderData, setDeleteOrderData] = useState<Order | null>(null);
-  
+  const [infoOrder, setInfoOrder] = useState<Order | null>(null);
+
   // Edit State
   const [editOrderData, setEditOrderData] = useState<Order | null>(null);
   const [editHandle, setEditHandle] = useState("");
@@ -100,7 +99,7 @@ export default function OrdersPage() {
 
   const filteredOrders = useMemo(() => {
     return orders.filter(o => {
-      const matchesSearch = 
+      const matchesSearch =
         o.piece_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         o.instagram_handle.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesStatus = statusFilter === "Todos" || o.production_status === statusFilter;
@@ -122,16 +121,15 @@ export default function OrdersPage() {
     if (order.production_status === newStatus) return;
     try {
       let isDeducted = order.filaments_deducted;
-      
-      // Gatilho de Consumo
+
       if (newStatus === "Concluído" && !order.filaments_deducted && order.used_filaments && order.used_filaments.length > 0) {
         await consumeFilamentsTransaction(order.used_filaments);
         isDeducted = true;
       }
 
-      await updateOrder(order.id, { 
+      await updateOrder(order.id, {
         production_status: newStatus,
-        filaments_deducted: isDeducted
+        filaments_deducted: isDeducted,
       });
 
       setOrders(prev => prev.map(o => o.id === order.id ? { ...o, production_status: newStatus, filaments_deducted: isDeducted } : o));
@@ -155,7 +153,6 @@ export default function OrdersPage() {
       const p = parseFloat(editPrice) || 0;
       let isDeducted = editOrderData.filaments_deducted;
 
-      // Se mudou para Concluído manualmente na edição
       if (editProdStatus === "Concluído" && editOrderData.production_status !== "Concluído" && !editOrderData.filaments_deducted && editOrderData.used_filaments && editOrderData.used_filaments.length > 0) {
         await consumeFilamentsTransaction(editOrderData.used_filaments);
         isDeducted = true;
@@ -166,7 +163,7 @@ export default function OrdersPage() {
         price: p,
         production_status: editProdStatus,
         payment_status: editPayStatus,
-        filaments_deducted: isDeducted
+        filaments_deducted: isDeducted,
       });
 
       setEditOrderData(null);
@@ -192,7 +189,7 @@ export default function OrdersPage() {
   return (
     <div className="flex-1 p-4 md:p-8">
       <div className="max-w-6xl mx-auto space-y-8">
-        
+
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3 mb-2">
@@ -212,34 +209,34 @@ export default function OrdersPage() {
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input 
-              placeholder="Buscar por cliente ou peça..." 
+            <Input
+              placeholder="Buscar por cliente ou peça..."
               className="pl-9 w-full bg-background"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
           <div className="flex gap-2">
-             <div className="relative">
-                <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
-                  <SelectTrigger className="w-[180px] pl-9 bg-background">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Todos">Todos os Status</SelectItem>
-                    <SelectItem value="Na Fila">Na Fila</SelectItem>
-                    <SelectItem value="Imprimindo">Imprimindo</SelectItem>
-                    <SelectItem value="Concluído">Concluído</SelectItem>
-                  </SelectContent>
-                </Select>
-             </div>
+            <div className="relative">
+              <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as any)}>
+                <SelectTrigger className="w-[180px] pl-9 bg-background">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Todos">Todos os Status</SelectItem>
+                  <SelectItem value="Na Fila">Na Fila</SelectItem>
+                  <SelectItem value="Imprimindo">Imprimindo</SelectItem>
+                  <SelectItem value="Concluído">Concluído</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-             {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-48 bg-muted animate-pulse rounded-xl" />)}
+            {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-48 bg-muted animate-pulse rounded-xl" />)}
           </div>
         ) : filteredOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center px-4">
@@ -251,144 +248,168 @@ export default function OrdersPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-             {filteredOrders.map(order => {
-               const qty = order.quantity || 1;
-               const isAssigned = order.assigned_from_inventory;
-               return (
-                 <Card key={order.id} className="border-border hover:border-primary/20 transition-all flex flex-col pt-1">
-                    <CardHeader className="p-4 pb-0 flex flex-row items-start justify-between">
-                       <div>
-                         <Badge variant="outline" className={`mb-3 ${STATUS_COLORS[order.production_status]}`}>
-                           {order.production_status === "Na Fila" && <Clock className="w-3 h-3 mr-1" />}
-                           {order.production_status === "Imprimindo" && <PlayCircle className="w-4 h-4 mr-2" />}
-                           {order.production_status === "Concluído" && <CheckCircle2 className="w-3 h-3 mr-1" />}
-                           {order.production_status}
-                         </Badge>
-                         <h3 className="font-semibold text-sm leading-tight text-foreground line-clamp-2 pr-4">{order.piece_name}</h3>
-                         <p className="text-xs text-muted-foreground mt-1">
-                           {qty}x • {order.material} {isAssigned && "(Estoque)"}
-                         </p>
-                       </div>
-                       <DropdownMenu>
-                         <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 text-muted-foreground" />}>
-                           <MoreVertical className="h-4 w-4" />
-                         </DropdownMenuTrigger>
-                         <DropdownMenuContent align="end" className="w-48">
-                           <DropdownMenuGroup>
-                             <DropdownMenuLabel>Ações</DropdownMenuLabel>
-                             {order.production_status !== "Concluído" && (
-                               <>
-                                 {order.production_status === "Na Fila" ? (
-                                   <DropdownMenuItem onClick={() => handleProductionTransition(order, "Imprimindo")}>
-                                     <PlayCircle className="w-4 h-4 mr-2" /> Iniciar Impressão
-                                   </DropdownMenuItem>
-                                 ) : (
-                                   <DropdownMenuItem onClick={() => handleProductionTransition(order, "Concluído")}>
-                                     <CheckCircle2 className="w-4 h-4 mr-2" /> Finalizar Impressão
-                                   </DropdownMenuItem>
-                                 )}
-                               </>
-                             )}
-                           </DropdownMenuGroup>
-                           <DropdownMenuSeparator />
-                           <DropdownMenuGroup>
-                             <DropdownMenuItem onClick={() => openEdit(order)}>
-                               <Edit2 className="w-4 h-4 mr-2 text-blue-500" /> Editar Cadastro
-                             </DropdownMenuItem>
-                           </DropdownMenuGroup>
-                           <DropdownMenuSeparator />
-                           <DropdownMenuGroup>
-                             <DropdownMenuItem onClick={() => setDeleteOrderData(order)} className="text-destructive focus:text-destructive">
-                               <Trash2 className="w-4 h-4 mr-2" /> Excluir Pedido
-                             </DropdownMenuItem>
-                           </DropdownMenuGroup>
-                         </DropdownMenuContent>
-                       </DropdownMenu>
-                    </CardHeader>
-                    <CardContent className="p-4 pt-3 mt-auto border-t border-border mt-3 space-y-3">
-                       <div className="flex items-center justify-between">
-                         <div className="flex items-center gap-1.5 text-sm text-foreground">
-                           <span className="font-medium">{order.instagram_handle}</span>
-                         </div>
-                         <Button 
-                           variant="ghost" 
-                           size="sm" 
-                           className={`h-6 px-2 text-xs border ${PAYMENT_COLORS[order.payment_status]} hover:opacity-80`}
-                           onClick={() => handlePaymentToggle(order)}
-                         >
-                           {order.payment_status}
-                         </Button>
-                       </div>
-                       <div className="flex items-center justify-between">
-                         <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Custo</span>
-                         <span className="text-sm font-semibold">{formatBRL(order.base_cost || 0)}</span>
-                       </div>
-                       <div className="flex items-center justify-between bg-muted/40 p-2 rounded-lg border border-border">
-                         <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Venda</span>
-                         <span className="text-lg font-bold text-primary">{formatBRL(order.price)}</span>
-                       </div>
-                       {order.filaments_deducted && (
-                           <div className="flex -mt-1 w-full justify-end">
-                               <span className="text-[10px] text-muted-foreground">✓ Bobinas deduzidas</span>
-                           </div>
-                       )}
-                    </CardContent>
-                 </Card>
-               );
-             })}
+            {filteredOrders.map(order => {
+              const qty = order.quantity || 1;
+              const isAssigned = order.assigned_from_inventory;
+              return (
+                <Card key={order.id} className="border-border hover:border-primary/20 transition-all flex flex-col pt-1">
+                  <CardHeader className="p-4 pb-0 flex flex-row items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Badge variant="outline" className={STATUS_COLORS[order.production_status]}>
+                          {order.production_status === "Na Fila" && <Clock className="w-3 h-3 mr-1" />}
+                          {order.production_status === "Imprimindo" && <PlayCircle className="w-4 h-4 mr-2" />}
+                          {order.production_status === "Concluído" && <CheckCircle2 className="w-3 h-3 mr-1" />}
+                          {order.production_status}
+                        </Badge>
+                        {/* Botão Info */}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 text-muted-foreground hover:text-primary"
+                          onClick={() => setInfoOrder(order)}
+                          title="Ver detalhamento de custos"
+                        >
+                          <Info className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                      <h3 className="font-semibold text-sm leading-tight text-foreground line-clamp-2 pr-4">{order.piece_name}</h3>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {qty}x • {order.material} {isAssigned && "(Estoque)"}
+                      </p>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="h-8 w-8 -mr-2 text-muted-foreground" />}>
+                        <MoreVertical className="h-4 w-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48">
+                        <DropdownMenuGroup>
+                          <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                          {order.production_status !== "Concluído" && (
+                            <>
+                              {order.production_status === "Na Fila" ? (
+                                <DropdownMenuItem onClick={() => handleProductionTransition(order, "Imprimindo")}>
+                                  <PlayCircle className="w-4 h-4 mr-2" /> Iniciar Impressão
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onClick={() => handleProductionTransition(order, "Concluído")}>
+                                  <CheckCircle2 className="w-4 h-4 mr-2" /> Finalizar Impressão
+                                </DropdownMenuItem>
+                              )}
+                            </>
+                          )}
+                        </DropdownMenuGroup>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuGroup>
+                          <DropdownMenuItem onClick={() => openEdit(order)}>
+                            <Edit2 className="w-4 h-4 mr-2 text-blue-500" /> Editar Cadastro
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuGroup>
+                          <DropdownMenuItem onClick={() => setDeleteOrderData(order)} className="text-destructive focus:text-destructive">
+                            <Trash2 className="w-4 h-4 mr-2" /> Excluir Pedido
+                          </DropdownMenuItem>
+                        </DropdownMenuGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-3 mt-auto border-t border-border mt-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-sm text-foreground">
+                        <span className="font-medium">{order.instagram_handle}</span>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`h-6 px-2 text-xs border ${PAYMENT_COLORS[order.payment_status]} hover:opacity-80`}
+                        onClick={() => handlePaymentToggle(order)}
+                      >
+                        {order.payment_status}
+                      </Button>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Custo</span>
+                      <span className="text-sm font-semibold">{formatBRL(order.base_cost || 0)}</span>
+                    </div>
+                    <div className="flex items-center justify-between bg-muted/40 p-2 rounded-lg border border-border">
+                      <span className="text-xs text-muted-foreground uppercase font-semibold tracking-wider">Venda</span>
+                      <span className="text-lg font-bold text-primary">{formatBRL(order.price)}</span>
+                    </div>
+                    {order.filaments_deducted && (
+                      <div className="flex -mt-1 w-full justify-end">
+                        <span className="text-[10px] text-muted-foreground">✓ Bobinas deduzidas</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
 
       </div>
 
-      <ResponsiveModal 
-        open={!!editOrderData} 
+      {/* ── Modal: Info do Pedido ── */}
+      <ResponsiveModal
+        open={!!infoOrder}
+        onOpenChange={(v) => !v && setInfoOrder(null)}
+        title="Detalhamento do Pedido"
+        description={infoOrder ? `${infoOrder.piece_name} · ${infoOrder.quantity || 1}x` : ""}
+      >
+        {infoOrder && <OrderInfoContent order={infoOrder} />}
+      </ResponsiveModal>
+
+      {/* ── Modal: Editar Pedido ── */}
+      <ResponsiveModal
+        open={!!editOrderData}
         onOpenChange={(v) => !v && setEditOrderData(null)}
         title="Editar Pedido"
       >
-         <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Instagram / Cliente</Label>
-              <Input value={editHandle} onChange={(e) => setEditHandle(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Preço de Venda Final (R$)</Label>
-              <Input type="number" step={0.01} value={editPrice} onChange={(e) => setEditPrice(e.target.value)} />
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Status Produção</Label>
-                <Select value={editProdStatus} onValueChange={(v) => setEditProdStatus(v as any)}>
-                   <SelectTrigger><SelectValue/></SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="Na Fila">Na Fila</SelectItem>
-                     <SelectItem value="Imprimindo">Imprimindo</SelectItem>
-                     <SelectItem value="Concluído">Concluído</SelectItem>
-                   </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Status Pagamento</Label>
-                <Select value={editPayStatus} onValueChange={(v) => setEditPayStatus(v as any)}>
-                   <SelectTrigger><SelectValue/></SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="Pendente">Pendente</SelectItem>
-                     <SelectItem value="Pago">Pago</SelectItem>
-                   </SelectContent>
-                </Select>
-              </div>
-            </div>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>Instagram / Cliente</Label>
+            <Input value={editHandle} onChange={(e) => setEditHandle(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Preço de Venda Final (R$)</Label>
+            <Input type="number" step={0.01} value={editPrice} onChange={(e) => setEditPrice(e.target.value)} />
+          </div>
 
-            <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
-              <Button variant="outline" className="flex-1" onClick={() => setEditOrderData(null)} disabled={savingEdit}>Cancelar</Button>
-              <Button className="flex-1" onClick={handleSaveEdit} disabled={!editHandle.trim() || savingEdit}>
-                {savingEdit ? "Salvando..." : "Salvar"}
-              </Button>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Status Produção</Label>
+              <Select value={editProdStatus} onValueChange={(v) => setEditProdStatus(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Na Fila">Na Fila</SelectItem>
+                  <SelectItem value="Imprimindo">Imprimindo</SelectItem>
+                  <SelectItem value="Concluído">Concluído</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-         </div>
+            <div className="space-y-2">
+              <Label>Status Pagamento</Label>
+              <Select value={editPayStatus} onValueChange={(v) => setEditPayStatus(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Pendente">Pendente</SelectItem>
+                  <SelectItem value="Pago">Pago</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
+            <Button variant="outline" className="flex-1" onClick={() => setEditOrderData(null)} disabled={savingEdit}>Cancelar</Button>
+            <Button className="flex-1" onClick={handleSaveEdit} disabled={!editHandle.trim() || savingEdit}>
+              {savingEdit ? "Salvando..." : "Salvar"}
+            </Button>
+          </div>
+        </div>
       </ResponsiveModal>
 
+      {/* ── Dialog: Excluir Pedido ── */}
       <AlertDialog open={!!deleteOrderData} onOpenChange={(v) => !v && setDeleteOrderData(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -406,6 +427,77 @@ export default function OrdersPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+    </div>
+  );
+}
+
+/** Componente de detalhamento de custos de um pedido */
+function OrderInfoContent({ order }: { order: Order }) {
+  const totalCost = (order.filament_cost || 0) + (order.machine_cost || 0) + (order.supplies_cost || 0);
+  const grossMargin = order.price > 0
+    ? ((order.price - totalCost) / order.price) * 100
+    : 0;
+
+  return (
+    <div className="space-y-4 py-2">
+      {/* Meta */}
+      <div className="grid grid-cols-2 gap-3">
+        {order.batch_time_minutes != null && (
+          <div className="bg-muted/40 rounded-lg p-3">
+            <p className="text-xs text-muted-foreground mb-1">Tempo de Lote</p>
+            <p className="font-semibold">{formatTime(order.batch_time_minutes)}</p>
+          </div>
+        )}
+        <div className="bg-muted/40 rounded-lg p-3">
+          <p className="text-xs text-muted-foreground mb-1">Material</p>
+          <p className="font-semibold">{order.material}</p>
+        </div>
+      </div>
+
+      {/* Breakdown de Custos */}
+      <div className="rounded-lg border border-border bg-muted/20 divide-y divide-border overflow-hidden">
+        <div className="flex justify-between items-center px-4 py-2.5 text-sm">
+          <span className="text-muted-foreground">Filamento (lote)</span>
+          <span className="font-medium tabular-nums">{formatBRL(order.filament_cost || 0)}</span>
+        </div>
+        <div className="flex justify-between items-center px-4 py-2.5 text-sm">
+          <span className="text-muted-foreground">Máquina (lote)</span>
+          <span className="font-medium tabular-nums">{formatBRL(order.machine_cost || 0)}</span>
+        </div>
+        {(order.supplies_cost || 0) > 0 && (
+          <div className="flex justify-between items-center px-4 py-2.5 text-sm">
+            <span className="text-muted-foreground">Insumos</span>
+            <span className="font-medium tabular-nums">{formatBRL(order.supplies_cost || 0)}</span>
+          </div>
+        )}
+        <div className="flex justify-between items-center px-4 py-2.5 text-sm font-semibold bg-muted/30">
+          <span>Custo Total</span>
+          <span className="tabular-nums">{formatBRL(totalCost)}</span>
+        </div>
+      </div>
+
+      {/* Venda e Margem */}
+      <div className="rounded-lg border border-primary/20 bg-primary/5 divide-y divide-border overflow-hidden">
+        <div className="flex justify-between items-center px-4 py-2.5 text-sm">
+          <span className="text-muted-foreground">Preço de Venda</span>
+          <span className="font-bold text-primary tabular-nums">{formatBRL(order.price)}</span>
+        </div>
+        <div className="flex justify-between items-center px-4 py-2.5 text-sm">
+          <span className="text-muted-foreground">Margem Bruta</span>
+          <span className={`font-bold tabular-nums ${grossMargin < 0 ? "text-red-400" : grossMargin < 40 ? "text-amber-400" : "text-green-400"}`}>
+            {grossMargin.toFixed(1)}%
+          </span>
+        </div>
+      </div>
+
+      {order.supplies && order.supplies.length > 0 && (
+        <div className="text-xs text-muted-foreground space-y-1">
+          <p className="font-medium text-foreground">Insumos incluídos:</p>
+          {order.supplies.map((s, i) => (
+            <p key={i}>• {s.name} × {s.quantity} — {formatBRL(s.unit_cost * s.quantity)}</p>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
