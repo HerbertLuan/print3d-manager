@@ -188,6 +188,15 @@ export default function CatalogPage() {
     };
   }, [selectedItem, orderQuantity, selectedSupplies, availableSupplies, orderPrice]);
 
+  // Atualiza o preço sugerido automaticamente sempre que a quantidade ou os insumos mudam
+  useEffect(() => {
+    if (batchStats && orderDialogOpen) {
+      const suggestedWithSupplies = batchStats.totalCostWithSupplies / (1 - batchStats.profitMargin);
+      setOrderPrice(suggestedWithSupplies.toFixed(2));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderQuantity, selectedSupplies]);
+
   async function handleCreateOrder() {
     if (!selectedItem || !instagramHandle.trim()) return;
     setOrdering(true);
@@ -370,7 +379,7 @@ export default function CatalogPage() {
           {availableSupplies.length > 0 && (
             <div className="space-y-3">
               <Label className="flex items-center gap-2"><Tag className="w-4 h-4" /> Insumos Extras</Label>
-              <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 max-h-32 overflow-y-auto">
+              <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 p-3 max-h-48 overflow-y-auto">
                 {availableSupplies.map((supply) => (
                   <div key={supply.id} className="flex items-center gap-3">
                     <Checkbox
@@ -379,11 +388,32 @@ export default function CatalogPage() {
                       onCheckedChange={(c) => setSelectedSupplies(p => c ? { ...p, [supply.id]: 1 } : Object.fromEntries(Object.entries(p).filter(([k]) => k !== supply.id)))}
                     />
                     <label htmlFor={`supply-${supply.id}`} className="flex-1 cursor-pointer text-sm font-medium">{supply.name}</label>
+                    <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                      {formatBRL(supply.unit_cost)}/un
+                    </span>
                     {selectedSupplies[supply.id] !== undefined && (
                       <Input type="number" min={1} value={selectedSupplies[supply.id]} onChange={(e) => setSelectedSupplies(p => ({ ...p, [supply.id]: parseInt(e.target.value) || 1 }))} className="w-16 h-7 px-1 text-center" />
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Tempo Estimado de Lote */}
+          {batchStats && (
+            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5 flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Clock className="w-3.5 h-3.5" />
+                <span>Tempo Estimado (lote)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-semibold tabular-nums">{formatTime(batchStats.batchTimeInMinutes)}</span>
+                {batchStats.timeSavedInMinutes > 0 && (
+                  <span className="text-[10px] font-semibold text-green-400 bg-green-400/10 border border-green-400/20 rounded-full px-2 py-0.5">
+                    -{formatTime(batchStats.timeSavedInMinutes)} economizados
+                  </span>
+                )}
               </div>
             </div>
           )}
