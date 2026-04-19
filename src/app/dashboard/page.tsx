@@ -121,10 +121,10 @@ export default function DashboardPage() {
       const inPeriod = allPeriod || mStr === currentMonthStr;
       if (!inPeriod) return;
 
-      s.revenue += o.price || 0;
-      s.filamentCost += o.filament_cost || 0;
-      s.machineCost += o.machine_cost || 0;
-      s.suppliesCost += o.supplies_cost || 0;
+      s.revenue += Number(o.price) || 0;
+      s.filamentCost += Number(o.filament_cost) || 0;
+      s.machineCost += Number(o.machine_cost) || 0;
+      s.suppliesCost += Number(o.supplies_cost) || 0;
       s.orderCount++;
     });
 

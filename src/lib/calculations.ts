@@ -154,6 +154,9 @@ function round2(value: number): number {
  */
 export const PRINTER_SETUP_TIME_MINUTES = 6;
 export const TRAVEL_PENALTY_PERCENTAGE = 1.02;
+/** Cap máximo da penalidade de viagem em minutos.
+ *  Impede que peças grandes gerem overhead infinito. */
+export const MAX_TRAVEL_PENALTY_MINUTES = 12;
 
 export interface BatchCostCalculationInput {
   unitTimeMinutes: number;
@@ -177,6 +180,9 @@ export interface BatchCostCalculationResult {
   batchTimeInMinutes: number;
   isolatedTotalTimeInMinutes: number;
   timeSavedInMinutes: number;
+  /** true quando o tempo físico de lote >= soma individual.
+   *  A máquina roda em produção contínua mas o setup é cobrado apenas 1x. */
+  continuousProductionMode: boolean;
   profitMargin: number;
 }
 
@@ -190,18 +196,39 @@ export function calculateBatchTimeAndCost(
   const margin = profitMarginPercent != null ? profitMarginPercent / 100 : DEFAULT_PROFIT_MARGIN;
 
   const qty = Math.max(1, quantity);
-
-  // Lógica de Otimização de Lote
-  let batchTimeInMinutes = unitTimeMinutes;
-  if (qty > 1) {
-    const realExtrusionPerPiece = Math.max(unitTimeMinutes - PRINTER_SETUP_TIME_MINUTES, 1);
-    batchTimeInMinutes = (PRINTER_SETUP_TIME_MINUTES + (realExtrusionPerPiece * qty)) * TRAVEL_PENALTY_PERCENTAGE;
-  }
-  
   const isolatedTotalTimeInMinutes = unitTimeMinutes * qty;
-  const timeSavedInMinutes = isolatedTotalTimeInMinutes - batchTimeInMinutes;
 
-  // Aplica as fórmulas base de custo com o novo tempo otimizado e peso do lote
+  // ── Lógica de Tempo de Lote ──────────────────────────────────────────────
+  let batchTimeInMinutes: number;
+  let timeSavedInMinutes: number;
+  let continuousProductionMode = false;
+
+  if (qty <= 1) {
+    batchTimeInMinutes = unitTimeMinutes;
+    timeSavedInMinutes = 0;
+  } else {
+    const realExtrusionPerPiece = Math.max(unitTimeMinutes - PRINTER_SETUP_TIME_MINUTES, 1);
+    const rawBatchBase = PRINTER_SETUP_TIME_MINUTES + (realExtrusionPerPiece * qty);
+
+    // Penalidade de viagem com cap máximo
+    const travelPenaltyMins = Math.min(
+      rawBatchBase * (TRAVEL_PENALTY_PERCENTAGE - 1),
+      MAX_TRAVEL_PENALTY_MINUTES
+    );
+    const physicalBatchTime = rawBatchBase + travelPenaltyMins;
+
+    if (physicalBatchTime >= isolatedTotalTimeInMinutes) {
+      // Peça grande: lote não economiza tempo, mas ainda economiza setup manual
+      batchTimeInMinutes = isolatedTotalTimeInMinutes;
+      timeSavedInMinutes = 0;
+      continuousProductionMode = true;
+    } else {
+      batchTimeInMinutes = physicalBatchTime;
+      timeSavedInMinutes = isolatedTotalTimeInMinutes - physicalBatchTime;
+    }
+  }
+
+  // ── Custo de Filamento ───────────────────────────────────────────────────
   let filamentCost = 0;
   if (unitFilaments && unitFilaments.length > 0) {
     for (const f of unitFilaments) {
@@ -210,10 +237,16 @@ export function calculateBatchTimeAndCost(
   } else if (unitWeightGrams && material) {
     filamentCost = calculateFilamentCost(unitWeightGrams * qty, material);
   }
-  
-  const machineCost = calculateMachineCost(0, batchTimeInMinutes); // enviando 0 horas e os minutos totais reais
+
+  // ── Custo de Máquina com Redutor de Setup ────────────────────────────────
+  // Setup é cobrado apenas uma vez no lote, independente da quantidade.
+  // Fórmula: custo_bruto_tempo - (setup_cost * (qty - 1))
+  const rawMachineCost = calculateMachineCost(0, batchTimeInMinutes);
+  const setupCostPerOccurrence = calculateMachineCost(0, PRINTER_SETUP_TIME_MINUTES);
+  const setupSaving = qty > 1 ? setupCostPerOccurrence * (qty - 1) : 0;
+  const machineCost = Math.max(0, rawMachineCost - setupSaving);
+
   const failureBuffer = (filamentCost + machineCost) * FAILURE_RATE;
-  
   const totalBaseCost = filamentCost + machineCost + failureBuffer;
   const suggestedPrice = totalBaseCost / (1 - margin);
 
@@ -226,6 +259,7 @@ export function calculateBatchTimeAndCost(
     batchTimeInMinutes: Math.ceil(batchTimeInMinutes),
     isolatedTotalTimeInMinutes: Math.ceil(isolatedTotalTimeInMinutes),
     timeSavedInMinutes: Math.ceil(timeSavedInMinutes),
+    continuousProductionMode,
     profitMargin: margin,
   };
 }

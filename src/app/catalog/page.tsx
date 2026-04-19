@@ -232,6 +232,10 @@ export default function CatalogPage() {
         orderPayload.filament_cost = batchStats.batchTotalFilamentCost;
         orderPayload.supplies_cost = batchStats.suppliesCostTotal;
         orderPayload.batch_time_minutes = batchStats.batchTimeInMinutes;
+        orderPayload.custo_operacional_total =
+          batchStats.batchTotalFilamentCost +
+          batchStats.batchTotalMachineCost +
+          batchStats.suppliesCostTotal;
       }
       if (suppliesList.length > 0) orderPayload.supplies = suppliesList;
 
@@ -402,20 +406,28 @@ export default function CatalogPage() {
 
           {/* Tempo Estimado de Lote */}
           {batchStats && (
-            <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5 flex items-center justify-between text-sm">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Clock className="w-3.5 h-3.5" />
-                <span>Tempo Estimado (lote)</span>
+            <>
+              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5 flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Tempo Estimado (lote)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold tabular-nums">{formatTime(batchStats.batchTimeInMinutes)}</span>
+                  {batchStats.timeSavedInMinutes > 0 && (
+                    <span className="text-[10px] font-semibold text-green-400 bg-green-400/10 border border-green-400/20 rounded-full px-2 py-0.5">
+                      -{formatTime(batchStats.timeSavedInMinutes)} economizados
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="font-semibold tabular-nums">{formatTime(batchStats.batchTimeInMinutes)}</span>
-                {batchStats.timeSavedInMinutes > 0 && (
-                  <span className="text-[10px] font-semibold text-green-400 bg-green-400/10 border border-green-400/20 rounded-full px-2 py-0.5">
-                    -{formatTime(batchStats.timeSavedInMinutes)} economizados
-                  </span>
-                )}
-              </div>
-            </div>
+              {batchStats.continuousProductionMode && parseInt(orderQuantity) > 1 && (
+                <p className="text-xs text-blue-400/90 flex items-start gap-1.5 pl-1">
+                  <span className="shrink-0 mt-0.5">&#9432;</span>
+                  <span>Otimização de mesa: Produção contínua ativada — setup cobrado apenas uma vez, reduzindo o custo de máquina por peça.</span>
+                </p>
+              )}
+            </>
           )}
 
           {/* Resumo de Custos */}

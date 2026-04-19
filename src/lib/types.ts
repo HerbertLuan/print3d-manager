@@ -130,6 +130,7 @@ export interface Order {
   supplies_cost?: number;  // Insumos extras
   
   batch_time_minutes?: number; // Tempo de lote otimizado
+  custo_operacional_total?: number; // filamento + máquina + insumos (salvo no momento do pedido)
   supplies?: SelectedSupply[]; // Insumos vinculados
   used_filaments?: SelectedFilamentUsage[]; // Rastreamento de bobinas físicas
   filaments_deducted?: boolean; // Se o peso das bobinas já foi descontado
