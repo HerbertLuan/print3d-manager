@@ -43,6 +43,18 @@ export interface CatalogItem {
   calculated_price: number;
   imageUrl?: string;
   created_at: Timestamp;
+
+  // ── Campos de Marketing / Vitrine Pública ──────────────
+  /** Exibir este item na loja pública */
+  showInStore?: boolean;
+  /** Nome comercial do produto para a vitrine */
+  headline_venda?: string;
+  /** Descrição curta focada em benefícios */
+  descricao_venda?: string;
+  /** Destaque na vitrine (aparece primeiro, badge especial) */
+  destaque?: boolean;
+  /** Preço de venda na loja pública (sobrepõe calculated_price na vitrine) */
+  preco_venda_loja?: number;
 }
 
 export type NewCatalogItem = Omit<CatalogItem, "id">;
@@ -107,7 +119,7 @@ export type NewExpense = Omit<Expense, "id">;
 // =====================================================
 
 export type PaymentStatus = "Pendente" | "Pago";
-export type ProductionStatus = "Na Fila" | "Imprimindo" | "Concluído";
+export type ProductionStatus = "pending_approval" | "Na Fila" | "Imprimindo" | "Concluído";
 
 export interface SelectedFilamentUsage {
   filament_id: string;
@@ -136,12 +148,53 @@ export interface Order {
   filaments_deducted?: boolean; // Se o peso das bobinas já foi descontado
   
   assigned_from_inventory?: boolean;
+  /** Origem do pedido: 'admin' (painel) | 'site' (vitrine pública) */
+  origem?: "admin" | "site";
+  /** Nome do cliente (pedidos vindos do site) */
+  cliente_nome?: string;
+  /** Telefone do cliente (pedidos vindos do site) */
+  cliente_telefone?: string;
+  /** Itens do carrinho (pedidos vindos do site) */
+  cart_items?: CartItem[];
   payment_status: PaymentStatus;
   production_status: ProductionStatus;
   created_at: Timestamp;
 }
 
 export type NewOrder = Omit<Order, "id">;
+
+// =====================================================
+// CART TYPES (Vitrine Pública)
+// =====================================================
+
+export interface CartItem {
+  /** ID do CatalogItem */
+  catalogItemId: string;
+  name: string;
+  /** headline_venda ou name */
+  displayName: string;
+  imageUrl?: string;
+  /** Preço unitário efetivo (preco_venda_loja ?? calculated_price) */
+  unitPrice: number;
+  quantity: number;
+}
+
+/** Payload enviado ao Firestore pelo cliente anônimo */
+export interface StoreOrder {
+  cliente_nome: string;
+  cliente_telefone: string;
+  cart_items: CartItem[];
+  valor_total: number;
+  origem: "site";
+  production_status: "pending_approval";
+  payment_status: "Pendente";
+  // Campos obrigatórios herdados do schema Order (preenchidos com defaults)
+  instagram_handle: string;
+  catalog_item_id: string;
+  piece_name: string;
+  material: string;
+  price: number;
+}
 
 // =====================================================
 // UI FORM TYPES

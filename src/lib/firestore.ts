@@ -18,6 +18,7 @@ import { deleteImageFromUrl } from "./storage";
 import {
   CatalogItem, NewCatalogItem,
   Order, NewOrder,
+  StoreOrder,
   InventoryItem, NewInventoryItem,
   Supply, NewSupply,
   Expense, NewExpense,
@@ -35,6 +36,32 @@ export async function getCatalogItems(): Promise<CatalogItem[]> {
     id: doc.id,
     ...doc.data(),
   })) as CatalogItem[];
+}
+
+/**
+ * Busca apenas itens marcados para a loja pública (showInStore === true).
+ * Ordenação em memória: destaques primeiro, depois por data decrescente.
+ * (Evita criar índice composto no Firestore)
+ */
+export async function getStoreItems(): Promise<CatalogItem[]> {
+  const q = query(
+    collection(db, "catalog"),
+    where("showInStore", "==", true)
+  );
+  const snapshot = await getDocs(q);
+  const items = snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as CatalogItem[];
+
+  // Ordenação: destaques primeiro, depois mais recentes
+  return items.sort((a, b) => {
+    if (a.destaque && !b.destaque) return -1;
+    if (!a.destaque && b.destaque) return 1;
+    const timeA = a.created_at?.seconds ?? 0;
+    const timeB = b.created_at?.seconds ?? 0;
+    return timeB - timeA;
+  });
 }
 
 export async function addCatalogItem(
@@ -212,6 +239,23 @@ export async function addOrder(
   });
   return docRef.id;
 }
+
+/**
+ * Cria um pedido originado na vitrine pública (cliente anônimo).
+ * Força origem='site' e production_status='pending_approval'.
+ * Configure as Security Rules do Firestore para validar esses campos.
+ */
+export async function createStoreOrder(order: StoreOrder): Promise<string> {
+  const docRef = await addDoc(collection(db, "orders"), {
+    ...order,
+    origem: "site",
+    production_status: "pending_approval",
+    payment_status: "Pendente",
+    created_at: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
 
 export async function updateOrder(
   id: string,

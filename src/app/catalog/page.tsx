@@ -105,6 +105,12 @@ export default function CatalogPage() {
   const [editTimeHours, setEditTimeHours] = useState("");
   const [editTimeMinutes, setEditTimeMinutes] = useState("");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
+  // Campos de marketing
+  const [editShowInStore, setEditShowInStore] = useState(false);
+  const [editDestaque, setEditDestaque] = useState(false);
+  const [editHeadlineVenda, setEditHeadlineVenda] = useState("");
+  const [editDescricaoVenda, setEditDescricaoVenda] = useState("");
+  const [editPrecoVendaLoja, setEditPrecoVendaLoja] = useState("");
 
   const loadItems = useCallback(async () => {
     setLoading(true);
@@ -135,13 +141,17 @@ export default function CatalogPage() {
       unitFilaments: [norm],
       profitMarginPercent: DEFAULT_PROFIT_MARGIN * 100,
     });
-    const suggested = batch.batchSuggestedPrice;
+    // Prioriza o preço de venda da loja se estiver definido; caso contrário usa o sugerido
+    const initialPrice =
+      item.preco_venda_loja && item.preco_venda_loja > 0
+        ? item.preco_venda_loja
+        : batch.batchSuggestedPrice;
 
     setSelectedItem(item);
     setOrderQuantity("1");
     setSelectedSupplies({});
     setInstagramHandle("");
-    setOrderPrice(suggested.toFixed(2));
+    setOrderPrice(initialPrice.toFixed(2));
     setOrderDialogOpen(true);
   }
 
@@ -154,6 +164,16 @@ export default function CatalogPage() {
     setEditTimeHours(Math.floor(item.time_minutes / 60).toString());
     setEditTimeMinutes((item.time_minutes % 60).toString());
     setEditImageFile(null);
+    // Campos de marketing
+    setEditShowInStore(item.showInStore ?? false);
+    setEditDestaque(item.destaque ?? false);
+    setEditHeadlineVenda(item.headline_venda ?? "");
+    setEditDescricaoVenda(item.descricao_venda ?? "");
+    setEditPrecoVendaLoja(
+      item.preco_venda_loja && item.preco_venda_loja > 0
+        ? item.preco_venda_loja.toFixed(2)
+        : ""
+    );
     setEditDialogOpen(true);
   }
 
@@ -271,12 +291,20 @@ export default function CatalogPage() {
         imageUrl = await uploadImage(editImageFile, `catalog/${Date.now()}_${editImageFile.name}`);
       }
 
-      const payload: any = {
+      // Garante que nenhum campo seja undefined no Firestore
+      const payload: Record<string, unknown> = {
         name: editName.trim(),
         material: editMaterial,
         weight_grams: weight,
         time_minutes: totalTime,
         calculated_price: costCalc.batchSuggestedPrice,
+        // Campos de marketing — sempre salvos (nunca undefined)
+        showInStore: editShowInStore,
+        destaque: editShowInStore ? editDestaque : false,
+        headline_venda: editHeadlineVenda.trim() || "",
+        descricao_venda: editDescricaoVenda.trim() || "",
+        // 0 = sem override (usa calculated_price); > 0 = preço customizado
+        preco_venda_loja: parseFloat(editPrecoVendaLoja) || 0,
       };
 
       if (imageUrl) {
@@ -522,7 +550,86 @@ export default function CatalogPage() {
             {selectedItem?.imageUrl && !editImageFile && <p className="text-xs text-muted-foreground">Deixe em branco para manter a foto atual.</p>}
           </div>
 
-          <div className="flex gap-2 pt-4">
+          {/* ── Seção de Marketing / Vitrine Pública ── */}
+          <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vitrine Pública</p>
+
+            {/* Toggle showInStore */}
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="edit-showInStore"
+                checked={editShowInStore}
+                onCheckedChange={(c) => {
+                  setEditShowInStore(!!c);
+                  if (!c) setEditDestaque(false);
+                }}
+              />
+              <label htmlFor="edit-showInStore" className="text-sm font-medium cursor-pointer">
+                Exibir na loja pública
+              </label>
+            </div>
+
+            {/* Toggle destaque (só visível se showInStore) */}
+            {editShowInStore && (
+              <div className="flex items-center gap-3 pl-5">
+                <Checkbox
+                  id="edit-destaque"
+                  checked={editDestaque}
+                  onCheckedChange={(c) => setEditDestaque(!!c)}
+                />
+                <label htmlFor="edit-destaque" className="text-sm font-medium cursor-pointer">
+                  Produto em destaque
+                  <span className="ml-1.5 text-xs text-muted-foreground">(aparece primeiro)</span>
+                </label>
+              </div>
+            )}
+
+            {/* Campos de marketing (sempre editáveis) */}
+            <div className="space-y-2">
+              <Label>Nome Comercial <span className="text-muted-foreground font-normal">(headline)</span></Label>
+              <Input
+                placeholder="Ex: Chaveiro Tech Connect"
+                value={editHeadlineVenda}
+                onChange={(e) => setEditHeadlineVenda(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Nome de venda exibido na vitrine. Se vazio, usa o nome técnico.</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Descrição de Venda</Label>
+              <textarea
+                className="w-full min-h-[80px] resize-y text-sm rounded-md border border-input bg-transparent px-3 py-2 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                placeholder="Ex: Compartilhe suas redes sociais com um toque. Chip NFC programável."
+                value={editDescricaoVenda}
+                onChange={(e) => setEditDescricaoVenda(e.target.value)}
+              />
+            </div>
+
+            {/* Preço de Venda da Loja */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Preço de Venda (Loja Pública)</Label>
+                {selectedItem && (
+                  <span className="text-xs text-muted-foreground">
+                    Sugerido: <span className="font-semibold text-primary">{formatBRL(selectedItem.calculated_price)}</span>
+                  </span>
+                )}
+              </div>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder={selectedItem ? selectedItem.calculated_price.toFixed(2) : "0.00"}
+                value={editPrecoVendaLoja}
+                onChange={(e) => setEditPrecoVendaLoja(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Deixe em branco para exibir o preço sugerido calculado automaticamente.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2">
             <Button variant="outline" className="flex-1" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
             <Button className="flex-1" onClick={handleSaveEdit} disabled={savingEdit || editName.trim() === ""}>
               {savingEdit ? "Salvando..." : "Salvar Edição"}
@@ -598,8 +705,18 @@ function CatalogCard({ item, onOrder, onEdit, onDelete }: any) {
 
         <div className="flex items-center justify-between pt-1 border-t border-border mt-3">
           <div className="mt-2">
-            <p className="text-xs text-muted-foreground">Preço Sugerido</p>
-            <p className="text-xl font-bold text-primary">{formatBRL(item.calculated_price)}</p>
+            {item.preco_venda_loja && item.preco_venda_loja > 0 ? (
+              <>
+                <p className="text-xs text-muted-foreground">Preço Loja</p>
+                <p className="text-xl font-bold text-primary">{formatBRL(item.preco_venda_loja)}</p>
+                <p className="text-[10px] text-muted-foreground/60 line-through">{formatBRL(item.calculated_price)}</p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs text-muted-foreground">Preço Sugerido</p>
+                <p className="text-xl font-bold text-primary">{formatBRL(item.calculated_price)}</p>
+              </>
+            )}
           </div>
           <Button size="sm" onClick={onOrder} className="gap-1.5 mt-2">
             <ShoppingCart className="w-3.5 h-3.5" />

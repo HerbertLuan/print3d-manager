@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getAuth } from "firebase/auth";
 
 // Puxa as chaves de segurança do arquivo .env.local
 const firebaseConfig = {
@@ -15,9 +16,9 @@ const firebaseConfig = {
 // Inicia o Firebase garantindo que não vai duplicar a conexão no Next.js
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
-// Inicia a conexão com o banco de dados (Firestore)
+// Serviços
 const db = getFirestore(app);
+const storage = getStorage(app);
+const auth = getAuth(app);
 
-const storage = getStorage(app); // <-- Adicione esta linha
-
-export { app, db, storage };
+export { app, db, storage, auth };

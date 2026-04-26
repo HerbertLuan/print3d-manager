@@ -3,10 +3,22 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calculator, BookOpen, ClipboardList, Printer, Menu, PackageOpen, Tag, LayoutDashboard } from "lucide-react";
+import {
+  Calculator,
+  BookOpen,
+  ClipboardList,
+  Printer,
+  Menu,
+  PackageOpen,
+  Tag,
+  LayoutDashboard,
+  LogOut,
+  Loader2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/lib/auth-context";
 
 const navItems = [
   {
@@ -47,6 +59,44 @@ const navItems = [
   },
 ];
 
+// ─── Botão de Logout ─────────────────────────────────────────────────────────
+
+function LogoutButton({ compact = false }: { compact?: boolean }) {
+  const { signOut } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await signOut();
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
+  return (
+    <button
+      onClick={handleSignOut}
+      disabled={signingOut}
+      className={cn(
+        "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+        "text-muted-foreground hover:bg-destructive/10 hover:text-destructive",
+        "disabled:opacity-50 disabled:cursor-not-allowed",
+        compact && "justify-center"
+      )}
+    >
+      {signingOut ? (
+        <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+      ) : (
+        <LogOut className="w-4 h-4 shrink-0" />
+      )}
+      {!compact && <span>{signingOut ? "Saindo..." : "Sair"}</span>}
+    </button>
+  );
+}
+
+// ─── Nav Links ───────────────────────────────────────────────────────────────
+
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
 
@@ -73,9 +123,7 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
               )}
             />
             <div className="flex flex-col min-w-0">
-              <span className="text-sm font-medium leading-tight">
-                {label}
-              </span>
+              <span className="text-sm font-medium leading-tight">{label}</span>
               <span
                 className={cn(
                   "text-xs leading-tight truncate",
@@ -94,6 +142,8 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+// ─── Logo ────────────────────────────────────────────────────────────────────
+
 function Logo() {
   return (
     <div className="flex items-center gap-3">
@@ -110,19 +160,33 @@ function Logo() {
   );
 }
 
+// ─── Sidebar Principal ────────────────────────────────────────────────────────
+
 export default function Sidebar() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const { user, loading } = useAuth();
 
-  if (pathname.startsWith("/store")) return null;
+  // Rotas onde a sidebar nunca deve aparecer
+  const hiddenRoutes = ["/store", "/login"];
+  const isHidden = hiddenRoutes.some(
+    (r) => pathname === r || pathname.startsWith(r + "/")
+  );
+
+  // Não renderiza: rota pública OU ainda carregando auth OU sem usuário
+  if (isHidden || loading || !user) return null;
 
   return (
     <>
-      {/* Mobile Top Header (hidden on md and up) */}
+      {/* Mobile Top Header */}
       <header className="md:hidden flex items-center justify-between p-4 border-b border-border bg-card sticky top-0 z-30">
         <Logo />
         <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger render={<Button variant="ghost" size="icon" className="shrink-0" />}>
+          <SheetTrigger
+            render={
+              <Button variant="ghost" size="icon" className="shrink-0" />
+            }
+          >
             <Menu className="w-6 h-6" />
             <span className="sr-only">Toggle menu</span>
           </SheetTrigger>
@@ -131,8 +195,9 @@ export default function Sidebar() {
               <Logo />
             </div>
             <NavLinks onNavigate={() => setOpen(false)} />
-            <div className="p-4 border-t border-border">
-              <p className="text-xs text-muted-foreground text-center">
+            <div className="p-4 border-t border-border space-y-1">
+              <LogoutButton />
+              <p className="text-xs text-muted-foreground text-center pt-1">
                 MVP v2.0 · Sua Loja 3D
               </p>
             </div>
@@ -140,14 +205,15 @@ export default function Sidebar() {
         </Sheet>
       </header>
 
-      {/* Desktop Sidebar (hidden on mobile) */}
+      {/* Desktop Sidebar */}
       <aside className="hidden md:flex w-64 min-h-screen bg-card border-r border-border flex-col shrink-0 sticky top-0">
         <div className="p-6 border-b border-border">
           <Logo />
         </div>
         <NavLinks />
-        <div className="p-4 border-t border-border">
-          <p className="text-xs text-muted-foreground text-center">
+        <div className="p-4 border-t border-border space-y-1">
+          <LogoutButton />
+          <p className="text-xs text-muted-foreground text-center pt-1">
             MVP v2.0 · Sua Loja 3D
           </p>
         </div>
