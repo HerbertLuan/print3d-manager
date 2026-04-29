@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getAuth } from "firebase/auth";
+import { getAnalytics, isSupported, type Analytics } from "firebase/analytics";
 
 // Puxa as chaves de segurança do arquivo .env.local
 const firebaseConfig = {
@@ -21,4 +22,18 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 const auth = getAuth(app);
 
-export { app, db, storage, auth };
+/**
+ * analytics — inicializado APENAS no browser.
+ * - `typeof window !== "undefined"` → impede execução no servidor (SSR/build).
+ * - `isSupported()` → garante que o browser não seja bloqueado por ad-blockers
+ *   ou ambientes que não suportem o SDK (ex: iframe sandboxed).
+ * Use sempre como: `const a = await analytics; if (a) logEvent(a, ...)`
+ */
+let analytics: Promise<Analytics | null>;
+if (typeof window !== "undefined") {
+  analytics = isSupported().then((ok) => (ok ? getAnalytics(app) : null));
+} else {
+  analytics = Promise.resolve(null);
+}
+
+export { app, db, storage, auth, analytics };

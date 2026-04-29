@@ -14,6 +14,13 @@ import {
   Sparkles,
   Tag,
   Edit2,
+  Search,
+  FolderOpen,
+  FolderPlus,
+  Layers,
+  ToggleLeft,
+  Star,
+  GripVertical,
 } from "lucide-react";
 import {
   Card,
@@ -33,6 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ResponsiveModal } from "@/components/ui/responsive-modal";
 import { ImageUpload } from "@/components/ui/image-upload";
 import {
@@ -46,8 +54,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { getCatalogItems, addOrder, deleteCatalogItem, getSupplies, updateCatalogItem } from "@/lib/firestore";
-import { CatalogItem, Supply, SelectedSupply } from "@/lib/types";
+import {
+  getCatalogItems,
+  addOrder,
+  deleteCatalogItem,
+  getSupplies,
+  updateCatalogItem,
+  getCollections,
+  addCollection,
+  updateCollection,
+  deleteCollection,
+} from "@/lib/firestore";
+import { CatalogItem, Supply, SelectedSupply, Collection } from "@/lib/types";
 import {
   formatBRL,
   formatTime,
@@ -56,6 +74,8 @@ import {
   MATERIAL_OPTIONS,
 } from "@/lib/calculations";
 import { uploadImage } from "@/lib/storage";
+
+// ─── Constantes e helpers ─────────────────────────────────────────────────────
 
 const MATERIAL_COLORS: Record<string, string> = {
   PLA: "bg-blue-500/10 text-blue-400 border-blue-500/20",
@@ -66,10 +86,18 @@ const MATERIAL_COLORS: Record<string, string> = {
   TPU: "bg-green-500/10 text-green-400 border-green-500/20",
 };
 
-/** Normaliza um item do catálogo para o modelo simples de 1 material.
- *  Fallback seguro: se o banco tiver required_filaments[], usa o primeiro.
- *  Nunca quebra a UI independente do formato salvo no Firestore.
- */
+const CATALOG_TAB_KEY = "print3d-catalog-active-tab";
+const PAGE_TABS = { CATALOG: "catalog", COLLECTIONS: "collections" };
+
+function slugify(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 function normalizeItem(item: CatalogItem): { material: string; weight_grams: number } {
   const rf = item.required_filaments;
   if (Array.isArray(rf) && rf.length > 0) {
@@ -78,26 +106,43 @@ function normalizeItem(item: CatalogItem): { material: string; weight_grams: num
   return { material: item.material ?? "PLA", weight_grams: item.weight_grams ?? 0 };
 }
 
+// ─── Page Principal ───────────────────────────────────────────────────────────
+
 export default function CatalogPage() {
+  // ── Dados ──
   const [items, setItems] = useState<CatalogItem[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
   const [availableSupplies, setAvailableSupplies] = useState<Supply[]>([]);
 
-  // Order state
+  // ── Tab principal e busca ──
+  const [mainTab, setMainTab] = useState(PAGE_TABS.CATALOG);
+  const [catalogTab, setCatalogTab] = useState<string>("__all__");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // ── Order state (multi-item internal cart) ──
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<CatalogItem | null>(null);
-  const [instagramHandle, setInstagramHandle] = useState("");
-  const [orderQuantity, setOrderQuantity] = useState("1");
+  const [clientName, setClientName] = useState("");
   const [orderPrice, setOrderPrice] = useState("");
   const [selectedSupplies, setSelectedSupplies] = useState<Record<string, number>>({});
-
   const [ordering, setOrdering] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
 
-  // Edit state
+  // Carrinho interno
+  const [orderLineItems, setOrderLineItems] = useState<{
+    item: CatalogItem;
+    qty: number;
+    unitPrice: number;
+    batchStats: ReturnType<typeof calculateBatchTimeAndCost>;
+  }[]>([]);
+  // Seletor de produto no modal
+  const [pickItemId, setPickItemId] = useState("");
+  const [pickQty, setPickQty] = useState("1");
+
+  // ── Edit state ──
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<CatalogItem | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
   const [editName, setEditName] = useState("");
   const [editMaterial, setEditMaterial] = useState("PLA");
@@ -105,23 +150,36 @@ export default function CatalogPage() {
   const [editTimeHours, setEditTimeHours] = useState("");
   const [editTimeMinutes, setEditTimeMinutes] = useState("");
   const [editImageFile, setEditImageFile] = useState<File | null>(null);
-  // Campos de marketing
   const [editShowInStore, setEditShowInStore] = useState(false);
   const [editDestaque, setEditDestaque] = useState(false);
   const [editHeadlineVenda, setEditHeadlineVenda] = useState("");
   const [editDescricaoVenda, setEditDescricaoVenda] = useState("");
   const [editPrecoVendaLoja, setEditPrecoVendaLoja] = useState("");
+  const [editCollectionId, setEditCollectionId] = useState<string>("");
 
-  const loadItems = useCallback(async () => {
+  // ── Collection management state ──
+  const [colDialogOpen, setColDialogOpen] = useState(false);
+  const [editingCollection, setEditingCollection] = useState<Collection | null>(null);
+  const [colNome, setColNome] = useState("");
+  const [colSlug, setColSlug] = useState("");
+  const [colOrdem, setColOrdem] = useState("0");
+  const [colAtivo, setColAtivo] = useState(true);
+  const [colEmDestaque, setColEmDestaque] = useState(false);
+  const [savingCol, setSavingCol] = useState(false);
+
+  // ── Carregar dados ──
+  const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [catalogData, suppliesData] = await Promise.all([
+      const [catalogData, suppliesData, collectionsData] = await Promise.all([
         getCatalogItems(),
         getSupplies(),
+        getCollections(),
       ]);
       setItems(catalogData);
       setAvailableSupplies(suppliesData);
+      setCollections(collectionsData);
     } catch (err) {
       console.error(err);
       setError("Erro ao carregar os dados.");
@@ -130,134 +188,227 @@ export default function CatalogPage() {
     }
   }, []);
 
-  useEffect(() => { loadItems(); }, [loadItems]);
+  useEffect(() => { loadAll(); }, [loadAll]);
+
+  // Restaura a aba ativa do catálogo do localStorage (QoL)
+  useEffect(() => {
+    const saved = localStorage.getItem(CATALOG_TAB_KEY);
+    if (saved) setCatalogTab(saved);
+  }, []);
+
+  function persistCatalogTab(tab: string) {
+    setCatalogTab(tab);
+    localStorage.setItem(CATALOG_TAB_KEY, tab);
+  }
+
+  // ─── Busca e agrupamento ──────────────────────────────────────────────────
+
+  /** Filtra itens pelo texto de busca global */
+  const filteredItems = useMemo(() => {
+    if (!searchQuery.trim()) return items;
+    const q = searchQuery.toLowerCase();
+    return items.filter(
+      (i) =>
+        i.name.toLowerCase().includes(q) ||
+        (i.headline_venda ?? "").toLowerCase().includes(q)
+    );
+  }, [items, searchQuery]);
+
+  /** Agrupa itens por coleção */
+  const groupedItems = useMemo(() => {
+    const groups: { id: string; label: string; items: CatalogItem[] }[] = [];
+
+    // Um grupo por coleção
+    collections.forEach((col) => {
+      groups.push({
+        id: col.id,
+        label: col.nome,
+        items: filteredItems.filter((i) => i.collectionId === col.id),
+      });
+    });
+
+    // Grupo "Geral" para itens sem coleção
+    groups.push({
+      id: "__general__",
+      label: "Geral",
+      items: filteredItems.filter(
+        (i) =>
+          !i.collectionId ||
+          !collections.find((c) => c.id === i.collectionId)
+      ),
+    });
+
+    return groups;
+  }, [filteredItems, collections]);
+
+  // ─── Handlers: Order ─────────────────────────────────────────────────────
 
   function openOrderDialog(item: CatalogItem) {
+    // Pré-adiciona o item clicado como primeira linha do carrinho interno
     const norm = normalizeItem(item);
-    const qty = 1;
     const batch = calculateBatchTimeAndCost({
       unitTimeMinutes: item.time_minutes,
-      quantity: qty,
+      quantity: 1,
       unitFilaments: [norm],
       profitMarginPercent: DEFAULT_PROFIT_MARGIN * 100,
     });
-    // Prioriza o preço de venda da loja se estiver definido; caso contrário usa o sugerido
-    const initialPrice =
+    const unitPrice =
       item.preco_venda_loja && item.preco_venda_loja > 0
         ? item.preco_venda_loja
         : batch.batchSuggestedPrice;
 
-    setSelectedItem(item);
-    setOrderQuantity("1");
+    setOrderLineItems([{ item, qty: 1, unitPrice, batchStats: batch }]);
+    setPickItemId("");
+    setPickQty("1");
     setSelectedSupplies({});
-    setInstagramHandle("");
-    setOrderPrice(initialPrice.toFixed(2));
+    setClientName("");
+    setOrderPrice("");
     setOrderDialogOpen(true);
   }
 
-  function openEditDialog(item: CatalogItem) {
-    const norm = normalizeItem(item);
-    setSelectedItem(item);
-    setEditName(item.name);
-    setEditMaterial(norm.material);
-    setEditWeight(norm.weight_grams.toString());
-    setEditTimeHours(Math.floor(item.time_minutes / 60).toString());
-    setEditTimeMinutes((item.time_minutes % 60).toString());
-    setEditImageFile(null);
-    // Campos de marketing
-    setEditShowInStore(item.showInStore ?? false);
-    setEditDestaque(item.destaque ?? false);
-    setEditHeadlineVenda(item.headline_venda ?? "");
-    setEditDescricaoVenda(item.descricao_venda ?? "");
-    setEditPrecoVendaLoja(
-      item.preco_venda_loja && item.preco_venda_loja > 0
-        ? item.preco_venda_loja.toFixed(2)
-        : ""
-    );
-    setEditDialogOpen(true);
-  }
-
-  const batchStats = useMemo(() => {
-    if (!selectedItem) return null;
-    const qty = Math.max(1, parseInt(orderQuantity) || 1);
-    const norm = normalizeItem(selectedItem);
-
+  /** Adiciona ou atualiza uma linha no carrinho interno */
+  function handleAddLineItem() {
+    const found = items.find((i) => i.id === pickItemId);
+    if (!found) return;
+    const qty = Math.max(1, parseInt(pickQty) || 1);
+    const norm = normalizeItem(found);
     const batch = calculateBatchTimeAndCost({
-      unitTimeMinutes: selectedItem.time_minutes,
+      unitTimeMinutes: found.time_minutes,
       quantity: qty,
       unitFilaments: [norm],
       profitMarginPercent: DEFAULT_PROFIT_MARGIN * 100,
     });
+    const unitPrice =
+      found.preco_venda_loja && found.preco_venda_loja > 0
+        ? found.preco_venda_loja
+        : batch.batchSuggestedPrice / qty;
+
+    setOrderLineItems((prev) => [
+      ...prev.filter((l) => l.item.id !== found.id), // evita duplicata
+      { item: found, qty, unitPrice, batchStats: batch },
+    ]);
+    setPickItemId("");
+    setPickQty("1");
+  }
+
+  function handleRemoveLineItem(itemId: string) {
+    setOrderLineItems((prev) => prev.filter((l) => l.item.id !== itemId));
+  }
+
+  /** Soma os batch stats de todas as linhas */
+  const totalBatchStats = useMemo(() => {
+    if (orderLineItems.length === 0) return null;
 
     const suppliesCostTotal = Object.entries(selectedSupplies).reduce((sum, [id, sqty]) => {
       const supply = availableSupplies.find((s) => s.id === id);
       return sum + (supply ? supply.unit_cost * sqty : 0);
     }, 0);
 
-    const totalCostWithSupplies = batch.batchTotalBaseCost + suppliesCostTotal;
+    let batchTotalFilamentCost = 0;
+    let batchTotalMachineCost = 0;
+    let batchTimeInMinutes = 0;
+    let timeSavedInMinutes = 0;
+
+    for (const line of orderLineItems) {
+      batchTotalFilamentCost += line.batchStats.batchTotalFilamentCost;
+      batchTotalMachineCost += line.batchStats.batchTotalMachineCost;
+      batchTimeInMinutes += line.batchStats.batchTimeInMinutes;
+      timeSavedInMinutes += line.batchStats.timeSavedInMinutes;
+    }
+
+    const totalBaseCost = batchTotalFilamentCost + batchTotalMachineCost;
+    const totalCostWithSupplies = totalBaseCost + suppliesCostTotal;
     const salePrice = parseFloat(orderPrice) || 0;
-    const grossMarginPercent = salePrice > 0
-      ? ((salePrice - totalCostWithSupplies) / salePrice) * 100
-      : 0;
+    const grossMarginPercent =
+      salePrice > 0 ? ((salePrice - totalCostWithSupplies) / salePrice) * 100 : 0;
+
+    // Preço sugerido total (soma dos preços individuais) + insumos
+    const suggestedPrice =
+      orderLineItems.reduce((s, l) => s + l.unitPrice * l.qty, 0) +
+      suppliesCostTotal;
 
     return {
-      ...batch,
+      batchTotalFilamentCost,
+      batchTotalMachineCost,
+      batchTimeInMinutes,
+      timeSavedInMinutes,
       suppliesCostTotal,
       totalCostWithSupplies,
       grossMarginPercent,
+      suggestedPrice,
+      profitMargin: DEFAULT_PROFIT_MARGIN,
     };
-  }, [selectedItem, orderQuantity, selectedSupplies, availableSupplies, orderPrice]);
+  }, [orderLineItems, selectedSupplies, availableSupplies, orderPrice]);
 
-  // Atualiza o preço sugerido automaticamente sempre que a quantidade ou os insumos mudam
+  // Auto-sugere preço quando as linhas ou insumos mudam
   useEffect(() => {
-    if (batchStats && orderDialogOpen) {
-      const suggestedWithSupplies = batchStats.totalCostWithSupplies / (1 - batchStats.profitMargin);
-      setOrderPrice(suggestedWithSupplies.toFixed(2));
+    if (totalBatchStats && orderDialogOpen) {
+      setOrderPrice(totalBatchStats.suggestedPrice.toFixed(2));
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderQuantity, selectedSupplies]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderLineItems, selectedSupplies]);
 
   async function handleCreateOrder() {
-    if (!selectedItem || !instagramHandle.trim()) return;
+    if (orderLineItems.length === 0 || !clientName.trim()) return;
     setOrdering(true);
     try {
-      const handle = instagramHandle.trim().replace(/^@/, "");
-      const qty = parseInt(orderQuantity) || 1;
-      const norm = normalizeItem(selectedItem);
-
       const suppliesList = Object.entries(selectedSupplies)
         .map(([id, sq]) => {
           const s = availableSupplies.find((x) => x.id === id);
           return s ? { supplyId: id, name: s.name, unit_cost: s.unit_cost, quantity: sq } : null;
-        }).filter(Boolean) as SelectedSupply[];
+        })
+        .filter(Boolean) as SelectedSupply[];
 
-      const salePrice = parseFloat(orderPrice) || batchStats?.batchSuggestedPrice || selectedItem.calculated_price;
+      const salePrice = parseFloat(orderPrice) || totalBatchStats?.suggestedPrice || 0;
+
+      // Primeira linha como item principal (legado)
+      const firstLine = orderLineItems[0];
+      const firstNorm = normalizeItem(firstLine.item);
+
+      // Linhas para novo campo items[]
+      const lineItemsPayload = orderLineItems.map((l) => {
+        const norm = normalizeItem(l.item);
+        return {
+          productId: l.item.id,
+          nome: l.item.name,
+          quantidade: l.qty,
+          preco_unitario: l.unitPrice,
+          custo_material_unitario: l.batchStats.batchTotalFilamentCost / l.qty,
+          custo_maquina_unitario: l.batchStats.batchTotalMachineCost / l.qty,
+          batch_time_minutes: l.batchStats.batchTimeInMinutes,
+        };
+      });
+
+      // Piece name resumido
+      const pieceName = orderLineItems
+        .map((l) => `${l.qty}× ${l.item.name}`)
+        .join(", ");
 
       const orderPayload: Parameters<typeof addOrder>[0] = {
-        instagram_handle: `@${handle}`,
-        catalog_item_id: selectedItem.id,
-        piece_name: selectedItem.name,
-        material: norm.material,
-        quantity: qty,
+        instagram_handle: clientName.trim(),
+        cliente_nome: clientName.trim(),
+        catalog_item_id: firstLine.item.id,
+        piece_name: pieceName,
+        material: firstNorm.material,
+        quantity: orderLineItems.reduce((s, l) => s + l.qty, 0),
         price: salePrice,
         payment_status: "Pendente",
         production_status: "Na Fila",
-        used_filaments: [],
-        filaments_deducted: false,
+        origem: "admin",
+        items: lineItemsPayload,
+        base_cost: totalBatchStats?.totalCostWithSupplies ?? 0,
+        machine_cost: totalBatchStats?.batchTotalMachineCost ?? 0,
+        filament_cost: totalBatchStats?.batchTotalFilamentCost ?? 0,
+        batch_time_minutes: totalBatchStats?.batchTimeInMinutes ?? 0,
+        custo_operacional_total:
+          (totalBatchStats?.batchTotalFilamentCost ?? 0) +
+          (totalBatchStats?.batchTotalMachineCost ?? 0) +
+          (totalBatchStats?.suppliesCostTotal ?? 0),
+        ...(totalBatchStats && totalBatchStats.suppliesCostTotal > 0
+          ? { supplies_cost: totalBatchStats.suppliesCostTotal }
+          : {}),
+        ...(suppliesList.length > 0 ? { supplies: suppliesList } : {}),
       };
-
-      if (batchStats) {
-        orderPayload.base_cost = batchStats.batchTotalBaseCost;
-        orderPayload.machine_cost = batchStats.batchTotalMachineCost;
-        orderPayload.filament_cost = batchStats.batchTotalFilamentCost;
-        orderPayload.supplies_cost = batchStats.suppliesCostTotal;
-        orderPayload.batch_time_minutes = batchStats.batchTimeInMinutes;
-        orderPayload.custo_operacional_total =
-          batchStats.batchTotalFilamentCost +
-          batchStats.batchTotalMachineCost +
-          batchStats.suppliesCostTotal;
-      }
-      if (suppliesList.length > 0) orderPayload.supplies = suppliesList;
 
       await addOrder(orderPayload);
       setOrderSuccess(true);
@@ -270,8 +421,32 @@ export default function CatalogPage() {
     }
   }
 
+  // ─── Handlers: Edit ───────────────────────────────────────────────────────
+
+  function openEditDialog(item: CatalogItem) {
+    const norm = normalizeItem(item);
+    setEditingItem(item);
+    setEditName(item.name);
+    setEditMaterial(norm.material);
+    setEditWeight(norm.weight_grams.toString());
+    setEditTimeHours(Math.floor(item.time_minutes / 60).toString());
+    setEditTimeMinutes((item.time_minutes % 60).toString());
+    setEditImageFile(null);
+    setEditShowInStore(item.showInStore ?? false);
+    setEditDestaque(item.destaque ?? false);
+    setEditHeadlineVenda(item.headline_venda ?? "");
+    setEditDescricaoVenda(item.descricao_venda ?? "");
+    setEditPrecoVendaLoja(
+      item.preco_venda_loja && item.preco_venda_loja > 0
+        ? item.preco_venda_loja.toFixed(2)
+        : ""
+    );
+    setEditCollectionId(item.collectionId ?? "");
+    setEditDialogOpen(true);
+  }
+
   async function handleSaveEdit() {
-    if (!selectedItem || !editName.trim()) return;
+    if (!editingItem || !editName.trim()) return;
     setSavingEdit(true);
     try {
       const min = parseInt(editTimeMinutes) || 0;
@@ -286,35 +461,33 @@ export default function CatalogPage() {
         profitMarginPercent: DEFAULT_PROFIT_MARGIN * 100,
       });
 
-      let imageUrl = selectedItem.imageUrl;
+      let imageUrl = editingItem.imageUrl;
       if (editImageFile) {
         imageUrl = await uploadImage(editImageFile, `catalog/${Date.now()}_${editImageFile.name}`);
       }
 
-      // Garante que nenhum campo seja undefined no Firestore
       const payload: Record<string, unknown> = {
         name: editName.trim(),
         material: editMaterial,
         weight_grams: weight,
         time_minutes: totalTime,
         calculated_price: costCalc.batchSuggestedPrice,
-        // Campos de marketing — sempre salvos (nunca undefined)
         showInStore: editShowInStore,
         destaque: editShowInStore ? editDestaque : false,
         headline_venda: editHeadlineVenda.trim() || "",
         descricao_venda: editDescricaoVenda.trim() || "",
-        // 0 = sem override (usa calculated_price); > 0 = preço customizado
         preco_venda_loja: parseFloat(editPrecoVendaLoja) || 0,
+        // Salva o collectionId — string vazia = sem coleção
+        collectionId: editCollectionId && editCollectionId !== "__none__" ? editCollectionId : "",
       };
 
-      if (imageUrl) {
-        payload.imageUrl = imageUrl;
-      }
+      if (imageUrl) payload.imageUrl = imageUrl;
 
-      await updateCatalogItem(selectedItem.id, payload);
+      await updateCatalogItem(editingItem.id, payload);
 
       setEditDialogOpen(false);
-      loadItems();
+      // Mantém a aba ativa ao recarregar
+      loadAll();
     } catch (err) {
       console.error("Erro na edição:", err);
     } finally {
@@ -332,25 +505,99 @@ export default function CatalogPage() {
     }
   }
 
+  // ─── Handlers: Collections ────────────────────────────────────────────────
+
+  function openNewCollection() {
+    setEditingCollection(null);
+    setColNome("");
+    setColSlug("");
+    setColOrdem(String(collections.length));
+    setColAtivo(true);
+    setColEmDestaque(false);
+    setColDialogOpen(true);
+  }
+
+  function openEditCollection(col: Collection) {
+    setEditingCollection(col);
+    setColNome(col.nome);
+    setColSlug(col.slug);
+    setColOrdem(String(col.ordem));
+    setColAtivo(col.ativo);
+    setColEmDestaque(col.em_destaque);
+    setColDialogOpen(true);
+  }
+
+  async function handleSaveCollection() {
+    if (!colNome.trim()) return;
+    setSavingCol(true);
+    try {
+      const data = {
+        nome: colNome.trim(),
+        slug: colSlug.trim() || slugify(colNome.trim()),
+        ordem: parseInt(colOrdem) || 0,
+        ativo: colAtivo,
+        em_destaque: colEmDestaque,
+      };
+      if (editingCollection) {
+        await updateCollection(editingCollection.id, data);
+      } else {
+        await addCollection(data);
+      }
+      setColDialogOpen(false);
+      loadAll();
+    } catch (err) {
+      console.error("Erro ao salvar coleção:", err);
+    } finally {
+      setSavingCol(false);
+    }
+  }
+
+  async function handleToggleColField(col: Collection, field: "ativo" | "em_destaque") {
+    try {
+      await updateCollection(col.id, { [field]: !col[field] });
+      setCollections((prev) =>
+        prev.map((c) => (c.id === col.id ? { ...c, [field]: !c[field] } : c))
+      );
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  async function handleDeleteCollection(col: Collection) {
+    try {
+      await deleteCollection(col.id);
+      setCollections((prev) => prev.filter((c) => c.id !== col.id));
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+
   return (
-    <div className="flex-1 p-4 md:p-8">
-      <div className="max-w-6xl mx-auto space-y-8">
-        <div className="flex items-center justify-between">
+    <div className="flex-1 p-4 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+
+        {/* Header */}
+        <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-3 mb-1">
               <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
                 <BookOpen className="w-5 h-5 text-primary" />
               </div>
-              <h1 className="text-2xl font-bold text-foreground">Catálogo de Peças</h1>
+              <h1 className="text-2xl font-bold text-foreground">Catálogo</h1>
             </div>
-            <p className="text-muted-foreground">{items.length} peças cadastradas</p>
+            <p className="text-muted-foreground text-sm">
+              {items.length} peças · {collections.length} coleções
+            </p>
           </div>
-          <Button variant="outline" size="sm" onClick={loadItems} disabled={loading}>
+          <Button variant="outline" size="sm" onClick={loadAll} disabled={loading}>
             <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
             Atualizar
           </Button>
         </div>
 
+        {/* Feedback global */}
         {orderSuccess && (
           <div className="bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg px-4 py-3 text-sm font-medium">
             ✓ Pedido criado com sucesso! Acesse o <strong>Gerenciador de Pedidos</strong>.
@@ -362,72 +609,385 @@ export default function CatalogPage() {
           </div>
         )}
 
-        {loading && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-64 bg-muted animate-pulse rounded-xl" />)}
-          </div>
-        )}
+        {/* ── Tabs Principais ── */}
+        <Tabs value={mainTab} onValueChange={setMainTab}>
+          <TabsList className="mb-4">
+            <TabsTrigger value={PAGE_TABS.CATALOG} className="gap-2">
+              <Layers className="w-4 h-4" /> Catálogo
+            </TabsTrigger>
+            <TabsTrigger value={PAGE_TABS.COLLECTIONS} className="gap-2">
+              <FolderOpen className="w-4 h-4" /> Coleções
+              {collections.length > 0 && (
+                <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 h-4">
+                  {collections.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-        {!loading && !error && items.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {items.map((item) => (
-              <CatalogCard
-                key={item.id}
-                item={item}
-                onOrder={() => openOrderDialog(item)}
-                onEdit={() => openEditDialog(item)}
-                onDelete={() => handleDeleteItem(item)}
+          {/* ══════════════════════════════════════════
+              Aba: Catálogo (listagem por grupos)
+          ══════════════════════════════════════════ */}
+          <TabsContent value={PAGE_TABS.CATALOG}>
+
+            {/* Busca Global */}
+            <div className="relative max-w-sm mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por nome ou headline…"
+                className="pl-9"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
-            ))}
-          </div>
-        )}
-
-        {!loading && !error && items.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-24 text-center px-4">
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
-              <Package className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-medium text-foreground mb-2">Catálogo vazio</h3>
-            <p className="text-muted-foreground max-w-sm">Use a Calculadora para criar e salvar peças no catálogo.</p>
-          </div>
-        )}
+
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-64 bg-muted animate-pulse rounded-xl" />
+                ))}
+              </div>
+            ) : searchQuery.trim() ? (
+              /* ── Modo Busca: ignora tabs, mostra todos os resultados ── */
+              <div>
+                <p className="text-xs text-muted-foreground mb-3">
+                  {filteredItems.length} resultado(s) para "{searchQuery}"
+                </p>
+                {filteredItems.length === 0 ? (
+                  <EmptyState message="Nenhuma peça encontrada para esta busca." />
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {filteredItems.map((item) => (
+                      <CatalogCard
+                        key={item.id}
+                        item={item}
+                        collections={collections}
+                        onOrder={() => openOrderDialog(item)}
+                        onEdit={() => openEditDialog(item)}
+                        onDelete={() => handleDeleteItem(item)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* ── Modo Normal: Tabs por Coleção ── */
+              <Tabs value={catalogTab} onValueChange={persistCatalogTab}>
+                <TabsList className="flex flex-wrap h-auto gap-1 mb-4 bg-muted/40 p-1">
+                  <TabsTrigger value="__all__" className="text-xs h-7 px-3 rounded-md">
+                    Todos ({items.length})
+                  </TabsTrigger>
+                  {groupedItems.map((group) => (
+                    <TabsTrigger
+                      key={group.id}
+                      value={group.id}
+                      className="text-xs h-7 px-3 rounded-md"
+                    >
+                      {group.label}
+                      <span className="ml-1.5 opacity-60">({group.items.length})</span>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+
+                {/* Tab Todos */}
+                <TabsContent value="__all__">
+                  {items.length === 0 ? (
+                    <EmptyState message="Use a Calculadora para criar e salvar peças no catálogo." />
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {items.map((item) => (
+                        <CatalogCard
+                          key={item.id}
+                          item={item}
+                          collections={collections}
+                          onOrder={() => openOrderDialog(item)}
+                          onEdit={() => openEditDialog(item)}
+                          onDelete={() => handleDeleteItem(item)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Tabs por Grupo */}
+                {groupedItems.map((group) => (
+                  <TabsContent key={group.id} value={group.id}>
+                    {group.items.length === 0 ? (
+                      <EmptyState message={`Nenhuma peça na coleção "${group.label}".`} />
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {group.items.map((item) => (
+                          <CatalogCard
+                            key={item.id}
+                            item={item}
+                            collections={collections}
+                            onOrder={() => openOrderDialog(item)}
+                            onEdit={() => openEditDialog(item)}
+                            onDelete={() => handleDeleteItem(item)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+                ))}
+              </Tabs>
+            )}
+          </TabsContent>
+
+          {/* ══════════════════════════════════════════
+              Aba: Coleções (CRUD)
+          ══════════════════════════════════════════ */}
+          <TabsContent value={PAGE_TABS.COLLECTIONS}>
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm text-muted-foreground">
+                Organize os produtos da vitrine em grupos temáticos.
+              </p>
+              <Button size="sm" onClick={openNewCollection} className="gap-2">
+                <FolderPlus className="w-4 h-4" />
+                Nova Coleção
+              </Button>
+            </div>
+
+            {loading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="h-16 bg-muted animate-pulse rounded-xl" />
+                ))}
+              </div>
+            ) : collections.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+                <FolderOpen className="w-12 h-12 text-muted-foreground/30" />
+                <p className="text-muted-foreground">Nenhuma coleção criada ainda.</p>
+                <Button size="sm" onClick={openNewCollection} className="gap-2">
+                  <FolderPlus className="w-4 h-4" /> Criar primeira coleção
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {collections.map((col) => (
+                  <div
+                    key={col.id}
+                    className="flex items-center gap-3 p-4 rounded-xl border border-border bg-card hover:border-primary/20 transition"
+                  >
+                    <GripVertical className="w-4 h-4 text-muted-foreground/40 shrink-0" />
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-sm text-foreground">{col.nome}</span>
+                        <code className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          /{col.slug}
+                        </code>
+                        {col.em_destaque && (
+                          <Badge className="text-[10px] px-1.5 h-4 bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                            <Star className="w-2.5 h-2.5 mr-0.5" /> Destaque
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {items.filter((i) => i.collectionId === col.id).length} produto(s) · ordem {col.ordem}
+                      </p>
+                    </div>
+
+                    {/* Toggles */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleToggleColField(col, "ativo")}
+                        className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-full border transition ${
+                          col.ativo
+                            ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                            : "bg-muted text-muted-foreground border-border"
+                        }`}
+                        title="Ativar/desativar na vitrine"
+                      >
+                        <ToggleLeft className="w-3 h-3" />
+                        {col.ativo ? "Ativa" : "Inativa"}
+                      </button>
+                    </div>
+
+                    {/* Ações */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => openEditCollection(col)}
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger
+                          render={
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                            />
+                          }
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Excluir Coleção</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              A coleção <strong>{col.nome}</strong> será excluída. Os produtos vinculados
+                              serão movidos para "Geral". Esta ação é irreversível.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteCollection(col)}
+                              className="bg-destructive hover:bg-destructive/90"
+                            >
+                              Excluir
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
-      {/* ── Modal: Gerar Pedido ── */}
+      {/* ── Modal: Gerar Pedido ─────────────────────────────────────────────── */}
       <ResponsiveModal
         open={orderDialogOpen}
         onOpenChange={setOrderDialogOpen}
         title="Gerar Pedido"
-        description={selectedItem ? `Peça: ${selectedItem.name}` : ""}
+        description="Adicione produtos ao pedido e defina o preço de venda."
       >
         <div className="space-y-5">
+
+          {/* Nome do cliente */}
           <div className="space-y-2">
-            <Label>@ do Instagram do Cliente</Label>
-            <Input placeholder="usuario_instagram" value={instagramHandle} onChange={(e) => setInstagramHandle(e.target.value)} />
+            <Label>Nome do Cliente</Label>
+            <Input
+              placeholder="Ex: Ana Silva"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+            />
           </div>
 
+          {/* ── Seletor de produto ── */}
           <div className="space-y-2">
-            <Label>Quantidade de Peças</Label>
-            <Input type="number" min={1} value={orderQuantity} onChange={(e) => setOrderQuantity(e.target.value)} />
+            <Label>Adicionar Produto ao Pedido</Label>
+            <div className="flex gap-2">
+              <Select value={pickItemId} onValueChange={(v) => setPickItemId(v ?? "")}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Selecione uma peça..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {items.map((it) => (
+                    <SelectItem key={it.id} value={it.id}>
+                      {it.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                min={1}
+                value={pickQty}
+                onChange={(e) => setPickQty(e.target.value)}
+                className="w-20"
+                placeholder="Qtd"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAddLineItem}
+                disabled={!pickItemId}
+              >
+                + Add
+              </Button>
+            </div>
           </div>
 
+          {/* ── Lista de itens adicionados ── */}
+          {orderLineItems.length > 0 && (
+            <div className="rounded-lg border border-border bg-muted/20 divide-y divide-border overflow-hidden text-sm">
+              {orderLineItems.map((line) => {
+                const lineTotal = line.unitPrice * line.qty;
+                return (
+                  <div key={line.item.id} className="flex items-center justify-between px-3 py-2 gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{line.item.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {line.qty}× {formatBRL(line.unitPrice)}/un
+                        {line.batchStats.timeSavedInMinutes > 0 && (
+                          <span className="ml-1.5 text-green-400 font-medium">
+                            (−{formatTime(line.batchStats.timeSavedInMinutes)} em lote)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <span className="font-semibold tabular-nums text-primary shrink-0">
+                      {formatBRL(lineTotal)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveLineItem(line.item.id)}
+                      className="text-muted-foreground hover:text-destructive transition shrink-0 ml-1"
+                      aria-label="Remover linha"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── Insumos Extras (INTACTOS) ── */}
           {availableSupplies.length > 0 && (
             <div className="space-y-3">
-              <Label className="flex items-center gap-2"><Tag className="w-4 h-4" /> Insumos Extras</Label>
+              <Label className="flex items-center gap-2">
+                <Tag className="w-4 h-4" /> Insumos Extras
+              </Label>
               <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 p-3 max-h-48 overflow-y-auto">
                 {availableSupplies.map((supply) => (
                   <div key={supply.id} className="flex items-center gap-3">
                     <Checkbox
                       id={`supply-${supply.id}`}
                       checked={selectedSupplies[supply.id] !== undefined}
-                      onCheckedChange={(c) => setSelectedSupplies(p => c ? { ...p, [supply.id]: 1 } : Object.fromEntries(Object.entries(p).filter(([k]) => k !== supply.id)))}
+                      onCheckedChange={(c) =>
+                        setSelectedSupplies((p) =>
+                          c
+                            ? { ...p, [supply.id]: 1 }
+                            : Object.fromEntries(
+                                Object.entries(p).filter(([k]) => k !== supply.id)
+                              )
+                        )
+                      }
                     />
-                    <label htmlFor={`supply-${supply.id}`} className="flex-1 cursor-pointer text-sm font-medium">{supply.name}</label>
+                    <label
+                      htmlFor={`supply-${supply.id}`}
+                      className="flex-1 cursor-pointer text-sm font-medium"
+                    >
+                      {supply.name}
+                    </label>
                     <span className="text-xs text-muted-foreground tabular-nums shrink-0">
                       {formatBRL(supply.unit_cost)}/un
                     </span>
                     {selectedSupplies[supply.id] !== undefined && (
-                      <Input type="number" min={1} value={selectedSupplies[supply.id]} onChange={(e) => setSelectedSupplies(p => ({ ...p, [supply.id]: parseInt(e.target.value) || 1 }))} className="w-16 h-7 px-1 text-center" />
+                      <Input
+                        type="number"
+                        min={1}
+                        value={selectedSupplies[supply.id]}
+                        onChange={(e) =>
+                          setSelectedSupplies((p) => ({
+                            ...p,
+                            [supply.id]: parseInt(e.target.value) || 1,
+                          }))
+                        }
+                        className="w-16 h-7 px-1 text-center"
+                      />
                     )}
                   </div>
                 ))}
@@ -435,56 +995,56 @@ export default function CatalogPage() {
             </div>
           )}
 
-          {/* Tempo Estimado de Lote */}
-          {batchStats && (
+          {/* ── Resumo de Lote (INTACTO — agora com soma de todos os itens) ── */}
+          {totalBatchStats && (
             <>
               <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5 flex items-center justify-between text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Clock className="w-3.5 h-3.5" />
-                  <span>Tempo Estimado (lote)</span>
+                  <span>Tempo Estimado Total (lote)</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold tabular-nums">{formatTime(batchStats.batchTimeInMinutes)}</span>
-                  {batchStats.timeSavedInMinutes > 0 && (
+                  <span className="font-semibold tabular-nums">
+                    {formatTime(totalBatchStats.batchTimeInMinutes)}
+                  </span>
+                  {totalBatchStats.timeSavedInMinutes > 0 && (
                     <span className="text-[10px] font-semibold text-green-400 bg-green-400/10 border border-green-400/20 rounded-full px-2 py-0.5">
-                      -{formatTime(batchStats.timeSavedInMinutes)} economizados
+                      -{formatTime(totalBatchStats.timeSavedInMinutes)} economizados
                     </span>
                   )}
                 </div>
               </div>
-              {batchStats.continuousProductionMode && parseInt(orderQuantity) > 1 && (
-                <p className="text-xs text-blue-400/90 flex items-start gap-1.5 pl-1">
-                  <span className="shrink-0 mt-0.5">&#9432;</span>
-                  <span>Otimização de mesa: Produção contínua ativada — setup cobrado apenas uma vez, reduzindo o custo de máquina por peça.</span>
-                </p>
-              )}
+
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Filamento (lote)</span>
+                  <span className="font-medium tabular-nums">
+                    {formatBRL(totalBatchStats.batchTotalFilamentCost)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Máquina (lote)</span>
+                  <span className="font-medium tabular-nums">
+                    {formatBRL(totalBatchStats.batchTotalMachineCost)}
+                  </span>
+                </div>
+                {totalBatchStats.suppliesCostTotal > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Insumos</span>
+                    <span className="font-medium tabular-nums">
+                      {formatBRL(totalBatchStats.suppliesCostTotal)}
+                    </span>
+                  </div>
+                )}
+                <div className="border-t border-border pt-1.5 flex justify-between items-center font-semibold">
+                  <span>Custo Total</span>
+                  <span className="tabular-nums">{formatBRL(totalBatchStats.totalCostWithSupplies)}</span>
+                </div>
+              </div>
             </>
           )}
 
-          {/* Resumo de Custos */}
-          {batchStats && (
-            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5 text-sm">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Filamento (lote)</span>
-                <span className="font-medium tabular-nums">{formatBRL(batchStats.batchTotalFilamentCost)}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Máquina (lote)</span>
-                <span className="font-medium tabular-nums">{formatBRL(batchStats.batchTotalMachineCost)}</span>
-              </div>
-              {batchStats.suppliesCostTotal > 0 && (
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Insumos</span>
-                  <span className="font-medium tabular-nums">{formatBRL(batchStats.suppliesCostTotal)}</span>
-                </div>
-              )}
-              <div className="border-t border-border pt-1.5 flex justify-between items-center font-semibold">
-                <span>Custo Total</span>
-                <span className="tabular-nums">{formatBRL(batchStats.totalCostWithSupplies)}</span>
-              </div>
-            </div>
-          )}
-
+          {/* ── Preço de Venda (INTACTO) ── */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-primary" />
@@ -496,24 +1056,47 @@ export default function CatalogPage() {
               value={orderPrice}
               onChange={(e) => setOrderPrice(e.target.value)}
             />
-            {batchStats && parseFloat(orderPrice) > 0 && (
-              <p className={`text-xs font-semibold ${batchStats.grossMarginPercent < 0 ? "text-red-400" : batchStats.grossMarginPercent < 40 ? "text-amber-400" : "text-green-400"}`}>
-                Margem Bruta: {batchStats.grossMarginPercent.toFixed(1)}%
+            {totalBatchStats && parseFloat(orderPrice) > 0 && (
+              <p
+                className={`text-xs font-semibold ${
+                  totalBatchStats.grossMarginPercent < 0
+                    ? "text-red-400"
+                    : totalBatchStats.grossMarginPercent < 40
+                    ? "text-amber-400"
+                    : "text-green-400"
+                }`}
+              >
+                Margem Bruta: {totalBatchStats.grossMarginPercent.toFixed(1)}%
               </p>
             )}
           </div>
 
           <div className="flex flex-col-reverse sm:flex-row gap-2">
-            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setOrderDialogOpen(false)}>Cancelar</Button>
-            <Button className="w-full sm:w-auto flex-1" onClick={handleCreateOrder} disabled={!instagramHandle.trim() || ordering}>
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setOrderDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="w-full sm:w-auto flex-1"
+              onClick={handleCreateOrder}
+              disabled={orderLineItems.length === 0 || !clientName.trim() || ordering}
+            >
               {ordering ? "Criando..." : "Criar Pedido"}
             </Button>
           </div>
         </div>
       </ResponsiveModal>
 
-      {/* ── Modal: Editar Peça ── */}
-      <ResponsiveModal open={editDialogOpen} onOpenChange={setEditDialogOpen} title="Editar Peça" description="Altere os parâmetros. O preço sugerido será recalculado.">
+      {/* ── Modal: Editar Peça ─────────────────────────────────────────────── */}
+      <ResponsiveModal
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        title="Editar Peça"
+        description="Altere os parâmetros. O preço sugerido será recalculado."
+      >
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label>Nome da Peça</Label>
@@ -523,38 +1106,88 @@ export default function CatalogPage() {
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label>Material</Label>
-              <Select value={editMaterial} onValueChange={(v) => setEditMaterial(v || "PLA")}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+              <Select
+                value={editMaterial}
+                onValueChange={(v) => setEditMaterial(v || "PLA")}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
-                  {MATERIAL_OPTIONS.map(m => <SelectItem key={m} value={m}>{m}</SelectItem>)}
+                  {MATERIAL_OPTIONS.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
               <Label>Peso (gramas)</Label>
-              <Input type="number" placeholder="0" value={editWeight} onChange={(e) => setEditWeight(e.target.value)} />
+              <Input
+                type="number"
+                placeholder="0"
+                value={editWeight}
+                onChange={(e) => setEditWeight(e.target.value)}
+              />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label>Tempo (Horas e Minutos)</Label>
             <div className="flex gap-2">
-              <Input type="number" value={editTimeHours} onChange={e => setEditTimeHours(e.target.value)} placeholder="0h" />
-              <Input type="number" value={editTimeMinutes} onChange={e => setEditTimeMinutes(e.target.value)} placeholder="0min" max={59} />
+              <Input
+                type="number"
+                value={editTimeHours}
+                onChange={(e) => setEditTimeHours(e.target.value)}
+                placeholder="0h"
+              />
+              <Input
+                type="number"
+                value={editTimeMinutes}
+                onChange={(e) => setEditTimeMinutes(e.target.value)}
+                placeholder="0min"
+                max={59}
+              />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label>Substituir Foto</Label>
             <ImageUpload onImageSelected={setEditImageFile} />
-            {selectedItem?.imageUrl && !editImageFile && <p className="text-xs text-muted-foreground">Deixe em branco para manter a foto atual.</p>}
+            {editingItem?.imageUrl && !editImageFile && (
+              <p className="text-xs text-muted-foreground">
+                Deixe em branco para manter a foto atual.
+              </p>
+            )}
           </div>
 
-          {/* ── Seção de Marketing / Vitrine Pública ── */}
-          <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-4">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Vitrine Pública</p>
+          {/* Coleção */}
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              <FolderOpen className="w-4 h-4 text-muted-foreground" /> Coleção
+            </Label>
+            <Select value={editCollectionId || "__none__"} onValueChange={(v) => setEditCollectionId(v ?? "")}>
+              <SelectTrigger>
+                <SelectValue placeholder="(sem coleção)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">— Sem coleção (Geral) —</SelectItem>
+                {collections.map((col) => (
+                  <SelectItem key={col.id} value={col.id}>
+                    {col.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            {/* Toggle showInStore */}
+          {/* Seção de Marketing */}
+          <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Vitrine Pública
+            </p>
+
             <div className="flex items-center gap-3">
               <Checkbox
                 id="edit-showInStore"
@@ -569,7 +1202,6 @@ export default function CatalogPage() {
               </label>
             </div>
 
-            {/* Toggle destaque (só visível se showInStore) */}
             {editShowInStore && (
               <div className="flex items-center gap-3 pl-5">
                 <Checkbox
@@ -584,15 +1216,19 @@ export default function CatalogPage() {
               </div>
             )}
 
-            {/* Campos de marketing (sempre editáveis) */}
             <div className="space-y-2">
-              <Label>Nome Comercial <span className="text-muted-foreground font-normal">(headline)</span></Label>
+              <Label>
+                Nome Comercial{" "}
+                <span className="text-muted-foreground font-normal">(headline)</span>
+              </Label>
               <Input
                 placeholder="Ex: Chaveiro Tech Connect"
                 value={editHeadlineVenda}
                 onChange={(e) => setEditHeadlineVenda(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">Nome de venda exibido na vitrine. Se vazio, usa o nome técnico.</p>
+              <p className="text-xs text-muted-foreground">
+                Nome de venda exibido na vitrine. Se vazio, usa o nome técnico.
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -605,13 +1241,15 @@ export default function CatalogPage() {
               />
             </div>
 
-            {/* Preço de Venda da Loja */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Preço de Venda (Loja Pública)</Label>
-                {selectedItem && (
+                {editingItem && (
                   <span className="text-xs text-muted-foreground">
-                    Sugerido: <span className="font-semibold text-primary">{formatBRL(selectedItem.calculated_price)}</span>
+                    Sugerido:{" "}
+                    <span className="font-semibold text-primary">
+                      {formatBRL(editingItem.calculated_price)}
+                    </span>
                   </span>
                 )}
               </div>
@@ -619,7 +1257,7 @@ export default function CatalogPage() {
                 type="number"
                 step="0.01"
                 min="0"
-                placeholder={selectedItem ? selectedItem.calculated_price.toFixed(2) : "0.00"}
+                placeholder={editingItem ? editingItem.calculated_price.toFixed(2) : "0.00"}
                 value={editPrecoVendaLoja}
                 onChange={(e) => setEditPrecoVendaLoja(e.target.value)}
               />
@@ -630,9 +1268,110 @@ export default function CatalogPage() {
           </div>
 
           <div className="flex gap-2 pt-2">
-            <Button variant="outline" className="flex-1" onClick={() => setEditDialogOpen(false)}>Cancelar</Button>
-            <Button className="flex-1" onClick={handleSaveEdit} disabled={savingEdit || editName.trim() === ""}>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setEditDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={handleSaveEdit}
+              disabled={savingEdit || editName.trim() === ""}
+            >
               {savingEdit ? "Salvando..." : "Salvar Edição"}
+            </Button>
+          </div>
+        </div>
+      </ResponsiveModal>
+
+      {/* ── Modal: Criar / Editar Coleção ──────────────────────────────────── */}
+      <ResponsiveModal
+        open={colDialogOpen}
+        onOpenChange={setColDialogOpen}
+        title={editingCollection ? "Editar Coleção" : "Nova Coleção"}
+      >
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label>Nome da Coleção *</Label>
+            <Input
+              placeholder="Ex: Dia das Mães"
+              value={colNome}
+              onChange={(e) => {
+                setColNome(e.target.value);
+                // Auto-gera slug apenas se não foi editado manualmente
+                if (!editingCollection) setColSlug(slugify(e.target.value));
+              }}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>
+              Slug <span className="text-muted-foreground font-normal">(URL)</span>
+            </Label>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground shrink-0">?categoria=</span>
+              <Input
+                placeholder="dia-das-maes"
+                value={colSlug}
+                onChange={(e) => setColSlug(e.target.value)}
+                className="font-mono text-sm"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Gerado automaticamente do nome. Não use espaços ou acentos.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Ordem de Exibição</Label>
+            <Input
+              type="number"
+              min={0}
+              value={colOrdem}
+              onChange={(e) => setColOrdem(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">Menor número = aparece primeiro.</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="col-ativo"
+                checked={colAtivo}
+                onCheckedChange={(c) => setColAtivo(!!c)}
+              />
+              <label htmlFor="col-ativo" className="text-sm font-medium cursor-pointer">
+                Ativa na vitrine
+              </label>
+            </div>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="col-destaque"
+                checked={colEmDestaque}
+                onCheckedChange={(c) => setColEmDestaque(!!c)}
+              />
+              <label htmlFor="col-destaque" className="text-sm font-medium cursor-pointer">
+                Em destaque
+              </label>
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setColDialogOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="flex-1"
+              onClick={handleSaveCollection}
+              disabled={savingCol || !colNome.trim()}
+            >
+              {savingCol ? "Salvando..." : editingCollection ? "Salvar" : "Criar Coleção"}
             </Button>
           </div>
         </div>
@@ -641,9 +1380,35 @@ export default function CatalogPage() {
   );
 }
 
-function CatalogCard({ item, onOrder, onEdit, onDelete }: any) {
+// ─── Sub-componentes ──────────────────────────────────────────────────────────
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+      <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-3">
+        <Package className="w-7 h-7 text-muted-foreground" />
+      </div>
+      <p className="text-muted-foreground text-sm">{message}</p>
+    </div>
+  );
+}
+
+function CatalogCard({
+  item,
+  collections,
+  onOrder,
+  onEdit,
+  onDelete,
+}: {
+  item: CatalogItem;
+  collections: Collection[];
+  onOrder: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const norm = normalizeItem(item);
   const matClass = MATERIAL_COLORS[norm.material] ?? "bg-muted";
+  const itemCollection = collections.find((c) => c.id === item.collectionId);
 
   return (
     <Card className="border-border hover:border-primary/30 transition-all duration-200 hover:shadow-md group overflow-hidden flex flex-col">
@@ -658,33 +1423,78 @@ function CatalogCard({ item, onOrder, onEdit, onDelete }: any) {
           <span className="text-xs text-muted-foreground/60">Sem foto</span>
         </div>
       )}
+
       <CardHeader className="pb-3 flex-1 relative">
         <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-background/80 backdrop-blur-sm p-1 rounded-md border border-border">
           <Button variant="ghost" size="icon" className="h-7 w-7 text-foreground" onClick={onEdit}>
             <Edit2 className="w-3.5 h-3.5" />
           </Button>
           <AlertDialog>
-            <AlertDialogTrigger render={<Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" />}>
+            <AlertDialogTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                />
+              }
+            >
               <Trash2 className="w-3.5 h-3.5" />
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Excluir do Catálogo</AlertDialogTitle>
-                <AlertDialogDescription>Você tem certeza? A peça será excluída permanentemente.</AlertDialogDescription>
+                <AlertDialogDescription>
+                  Você tem certeza? A peça será excluída permanentemente.
+                </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={onDelete} className="bg-destructive hover:bg-destructive/90">Excluir</AlertDialogAction>
+                <AlertDialogAction
+                  onClick={onDelete}
+                  className="bg-destructive hover:bg-destructive/90"
+                >
+                  Excluir
+                </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
         </div>
 
         <div className="flex items-start justify-between gap-2 pr-12">
-          <CardTitle className="text-base leading-tight">{item.name}</CardTitle>
-          <Badge variant="outline" className={`text-[10px] shrink-0 font-semibold ${matClass}`}>{norm.material}</Badge>
+          <div className="min-w-0">
+            <CardTitle className="text-base leading-tight">{item.name}</CardTitle>
+            {item.headline_venda && (
+              <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.headline_venda}</p>
+            )}
+          </div>
+          <Badge variant="outline" className={`text-[10px] shrink-0 font-semibold ${matClass}`}>
+            {norm.material}
+          </Badge>
+        </div>
+
+        {/* Badge de coleção */}
+        {itemCollection && (
+          <Badge variant="outline" className="w-fit text-[10px] mt-1 gap-1 text-muted-foreground">
+            <FolderOpen className="w-2.5 h-2.5" /> {itemCollection.nome}
+          </Badge>
+        )}
+
+        {/* Badges de vitrine */}
+        <div className="flex gap-1 flex-wrap mt-1">
+          {item.showInStore && (
+            <Badge variant="outline" className="text-[10px] text-emerald-400 border-emerald-500/30 bg-emerald-500/5">
+              🛍 Loja
+            </Badge>
+          )}
+          {item.destaque && (
+            <Badge variant="outline" className="text-[10px] text-orange-400 border-orange-500/30 bg-orange-500/5">
+              ⭐ Destaque
+            </Badge>
+          )}
         </div>
       </CardHeader>
+
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div className="bg-muted rounded-lg p-2.5 flex items-center gap-2">
@@ -709,7 +1519,9 @@ function CatalogCard({ item, onOrder, onEdit, onDelete }: any) {
               <>
                 <p className="text-xs text-muted-foreground">Preço Loja</p>
                 <p className="text-xl font-bold text-primary">{formatBRL(item.preco_venda_loja)}</p>
-                <p className="text-[10px] text-muted-foreground/60 line-through">{formatBRL(item.calculated_price)}</p>
+                <p className="text-[10px] text-muted-foreground/60 line-through">
+                  {formatBRL(item.calculated_price)}
+                </p>
               </>
             ) : (
               <>

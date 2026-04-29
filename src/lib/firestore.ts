@@ -23,6 +23,7 @@ import {
   Supply, NewSupply,
   Expense, NewExpense,
   Filament, NewFilament,
+  Collection, NewCollection,
 } from "./types";
 
 // =====================================================
@@ -395,3 +396,49 @@ export async function consumeFilamentsTransaction(
     }
   });
 }
+
+// =====================================================
+// COLLECTION OPERATIONS (Categorias)
+// =====================================================
+
+/** Busca todas as coleções, ordenadas por `ordem` asc. */
+export async function getCollections(): Promise<Collection[]> {
+  const q = query(collection(db, "collections"), orderBy("ordem", "asc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Collection[];
+}
+
+/** Busca apenas coleções ativas (usada pela vitrine pública). */
+export async function getActiveCollections(): Promise<Collection[]> {
+  // Usamos apenas o where() sem orderBy() para evitar a criação obrigatória de um
+  // índice composto (ativo + ordem) no Firestore. Ordenamos em memória.
+  const q = query(
+    collection(db, "collections"),
+    where("ativo", "==", true)
+  );
+  const snapshot = await getDocs(q);
+  const cols = snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Collection[];
+  return cols.sort((a, b) => a.ordem - b.ordem);
+}
+
+export async function addCollection(
+  data: Omit<NewCollection, "created_at">
+): Promise<string> {
+  const docRef = await addDoc(collection(db, "collections"), {
+    ...data,
+    created_at: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+export async function updateCollection(
+  id: string,
+  data: Partial<Omit<Collection, "id" | "created_at">>
+): Promise<void> {
+  await updateDoc(doc(db, "collections", id), data);
+}
+
+export async function deleteCollection(id: string): Promise<void> {
+  await deleteDoc(doc(db, "collections", id));
+}
+

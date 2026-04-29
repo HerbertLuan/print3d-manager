@@ -5,6 +5,8 @@ import Image from "next/image";
 import { useCartStore, useCartHydrated } from "@/lib/cart-store";
 import { createStoreOrder } from "@/lib/firestore";
 import { formatBRL } from "@/lib/calculations";
+import { logEvent } from "firebase/analytics";
+import { analytics } from "@/lib/firebase";
 import {
   ShoppingBag,
   X,
@@ -34,10 +36,9 @@ export function CartSheet() {
     totalItems,
   } = useCartStore();
 
-  const [nome, setNome] = useState("");
-  const [telefone, setTelefone] = useState("");
   const [loading, setLoading] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [confirmedShortCode, setConfirmedShortCode] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   const total = cartTotal();
@@ -45,12 +46,25 @@ export function CartSheet() {
 
   async function handleCheckout(e: React.FormEvent) {
     e.preventDefault();
-    if (!nome.trim() || !telefone.trim() || items.length === 0) return;
+    if (items.length === 0) return;
 
     setLoading(true);
     setError("");
 
     try {
+      // 📊 GA4: generate_lead — funil de venda: usuário clicou em "Finalizar Pedido"
+      // Disparado ANTES do Firestore para não perder o evento caso ocorra erro
+      await analytics.then((a) => {
+        if (!a) return;
+        logEvent(a, "generate_lead", {
+          currency: "BRL",
+          value: total, // total já com desconto de cupom (se implementado)
+        });
+      });
+
+      // Gera um short code (ex: A7F2)
+      const shortCode = Math.random().toString(36).substring(2, 6).toUpperCase();
+
       // Monta item principal para campos legados obrigatórios
       const firstItem = items[0];
       const allNames = items
@@ -58,22 +72,24 @@ export function CartSheet() {
         .join(", ");
 
       const id = await createStoreOrder({
-        cliente_nome: nome.trim(),
-        cliente_telefone: telefone.trim(),
+        cliente_nome: `Pedido Web #${shortCode}`,
+        cliente_telefone: "Aguardando WhatsApp",
         cart_items: items,
         valor_total: total,
         origem: "site",
         production_status: "pending_approval",
         payment_status: "Pendente",
         // Campos legados (obrigatórios pelo schema Order)
-        instagram_handle: nome.trim(),
+        instagram_handle: `Pedido Web #${shortCode}`,
         catalog_item_id: firstItem.catalogItemId,
         piece_name: allNames,
         material: "N/A",
         price: total,
+        shortCode,
       });
 
       setOrderId(id);
+      setConfirmedShortCode(shortCode);
 
       // Limpa carrinho
       clearCart();
@@ -84,12 +100,9 @@ export function CartSheet() {
         .join("\n");
 
       const msg = encodeURIComponent(
-        `Olá! Fiz um pedido no site.\n` +
-        `Meu nome é ${nome.trim()}.\n\n` +
-        `Pedido #${id.slice(-8).toUpperCase()}:\n` +
+        `Olá! Fiz o pedido *#${shortCode}* no site. Segue o resumo:\n\n` +
         `${itemsList}\n\n` +
-        `Total: ${formatBRL(total)}\n\n` +
-        `Telefone de contato: ${telefone.trim()}`
+        `*Total: ${formatBRL(total)}*`
       );
 
       window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, "_blank");
@@ -103,8 +116,7 @@ export function CartSheet() {
 
   function handleReset() {
     setOrderId(null);
-    setNome("");
-    setTelefone("");
+    setConfirmedShortCode(null);
     setError("");
     closeCart();
   }
@@ -160,7 +172,7 @@ export function CartSheet() {
             <p className="text-white/50 text-sm max-w-xs">
               Seu pedido{" "}
               <span className="font-mono font-bold text-white/80">
-                #{orderId.slice(-8).toUpperCase()}
+                #{confirmedShortCode}
               </span>{" "}
               foi registrado. O WhatsApp já foi aberto para você confirmar os
               detalhes com a gente.
@@ -282,39 +294,10 @@ export function CartSheet() {
                 </span>
               </div>
 
-              {/* Formulário de checkout */}
-              <div className="space-y-2.5">
-                <p className="text-xs font-semibold uppercase tracking-widest text-white/30">
-                  Seus dados
-                </p>
-                <input
-                  required
-                  placeholder="Seu nome completo"
-                  value={nome}
-                  onChange={(e) => setNome(e.target.value)}
-                  disabled={loading}
-                  className="w-full h-10 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/30 disabled:opacity-50 transition"
-                />
-                <input
-                  required
-                  type="tel"
-                  placeholder="Telefone / WhatsApp (ex: 61999999999)"
-                  value={telefone}
-                  onChange={(e) => setTelefone(e.target.value)}
-                  disabled={loading}
-                  className="w-full h-10 rounded-xl border border-white/10 bg-white/[0.04] px-3 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-white/30 disabled:opacity-50 transition"
-                />
-              </div>
-
-              {/* Erro */}
-              {error && (
-                <p className="text-xs text-red-400 text-center">{error}</p>
-              )}
-
-              {/* Botão Finalizar */}
+              {/* Botão Finalizar imediato */}
               <button
                 type="submit"
-                disabled={loading || !nome.trim() || !telefone.trim()}
+                disabled={loading || items.length === 0}
                 className="w-full h-12 rounded-full bg-gradient-to-r from-orange-500 to-rose-500 text-white font-bold text-sm hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
               >
                 {loading ? (

@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import Image from "next/image";
-import { getStoreItems } from "@/lib/firestore";
-import { CatalogItem } from "@/lib/types";
-import { formatBRL } from "@/lib/calculations";
+import { useEffect, useState, useRef, useMemo } from "react";
+import { getStoreItems, getActiveCollections } from "@/lib/firestore";
+import { CatalogItem, Collection } from "@/lib/types";
 import { Accordion } from "@/components/ui/accordion";
-import { useCartStore, useCartHydrated } from "@/lib/cart-store";
+import { useCartHydrated, useCartStore } from "@/lib/cart-store";
 import { CartSheet, CartFab } from "./components/CartSheet";
-import { toast } from "sonner";
+import { ExpandableCategory, CategoryGroup } from "./components/ExpandableCategory";
 import {
   Printer,
   ChevronRight,
@@ -18,10 +16,11 @@ import {
   Package,
   ArrowDown,
   MessageCircle,
-  Star,
   Sparkles,
   ShoppingBag,
 } from "lucide-react";
+import { logEvent } from "firebase/analytics";
+import { analytics } from "@/lib/firebase";
 
 // ─── Configuração (editável) ────────────────────────────────────────────────
 
@@ -113,11 +112,25 @@ function buildGenericWhatsappUrl(): string {
 // ─── Sub-componentes ──────────────────────────────────────────────────────────
 
 function Navbar() {
-  const { openCart, totalItems } = useCartStore();
+  const { openCart, totalItems, cartTotal } = useCartStore();
   const hydrated = useCartHydrated();
   // Durante SSR e 1ª renderização do cliente, força count=0
   // para evitar mismatch com o HTML gerado pelo servidor.
   const count = hydrated ? totalItems() : 0;
+
+  function handleOpenCart() {
+    // 📊 GA4: begin_checkout — dispara apenas quando há itens no carrinho
+    if (hydrated && totalItems() > 0) {
+      analytics.then((a) => {
+        if (!a) return;
+        logEvent(a, "begin_checkout", {
+          currency: "BRL",
+          value: cartTotal(),
+        });
+      });
+    }
+    openCart();
+  }
 
   return (
     <nav className="fixed top-0 inset-x-0 z-50 bg-black/50 backdrop-blur-2xl border-b border-white/[0.06]">
@@ -147,7 +160,7 @@ function Navbar() {
 
           {/* Botão carrinho na navbar */}
           <button
-            onClick={openCart}
+            onClick={handleOpenCart}
             aria-label="Abrir carrinho"
             className="relative flex items-center gap-2 h-9 px-4 rounded-full border border-white/15 text-white/60 text-sm hover:bg-white/5 hover:text-white hover:border-white/30 transition"
           >
@@ -268,206 +281,78 @@ function ValuePillars() {
   );
 }
 
-// ─── Card de Produto ──────────────────────────────────────────────────────────
 
-function ProductCard({ item }: { item: CatalogItem }) {
-  const { addItem } = useCartStore();
-  const [added, setAdded] = useState(false);
-  const displayName = item.headline_venda || item.name;
-  const description = item.descricao_venda;
 
-  const requiredFilaments = item.required_filaments || [
-    { material: item.material || "PLA", weight_grams: item.weight_grams || 0 },
-  ];
-  const isMultiColor = requiredFilaments.length > 1;
-  const primaryMaterial = requiredFilaments[0]?.material ?? "PLA";
-
-  // Preço efetivo: preco_venda_loja tem prioridade; fallback para calculated_price
-  const effectivePrice =
-    item.preco_venda_loja && item.preco_venda_loja > 0
-      ? item.preco_venda_loja
-      : item.calculated_price;
-
-  // Âncora de preço: multiplicador de 1.35 → simula 35% de desconto
-  const FAKE_PRICE_MULTIPLIER = 1.35;
-  const fakeOriginalPrice = effectivePrice * FAKE_PRICE_MULTIPLIER;
-
-  const isDestaque = item.destaque === true;
-
-  function handleAddToCart() {
-    addItem({
-      catalogItemId: item.id,
-      name: item.name,
-      displayName,
-      imageUrl: item.imageUrl,
-      unitPrice: effectivePrice,
-    });
-
-    // Feedback visual discreto no botão
-    setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
-
-    // Toast silencioso — não interrompe a navegação
-    toast.success(`${displayName} adicionado à sacola!`, {
-      duration: 2500,
-      position: "bottom-right",
-    });
-  }
-
+function CategorySkeleton() {
   return (
-    <article className="group relative flex flex-col bg-white/[0.025] border border-white/[0.07] hover:border-white/20 rounded-3xl overflow-hidden transition-all duration-300 hover:shadow-[0_0_40px_rgba(249,115,22,0.07)]">
-      {/* Destaque badge */}
-      {isDestaque && (
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-rose-500 text-white text-[10px] font-bold uppercase tracking-wider px-3 py-1 rounded-full shadow-lg">
-          <Star className="w-3 h-3 fill-white" />
-          Destaque
+    <div className="space-y-4 py-4">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-2xl bg-white/5 animate-pulse" />
+        <div className="space-y-1.5">
+          <div className="h-5 w-36 bg-white/8 rounded-full animate-pulse" />
+          <div className="h-3 w-20 bg-white/5 rounded-full animate-pulse" />
         </div>
-      )}
-
-      {/* Imagem */}
-      <div className="relative w-full aspect-[4/3] bg-black/20 overflow-hidden">
-        {item.imageUrl ? (
-          <Image
-            src={item.imageUrl}
-            alt={displayName}
-            fill
-            className="object-cover transition-transform duration-700 group-hover:scale-105"
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+      </div>
+      <div className="flex gap-3 overflow-hidden">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="flex-[0_0_72%] sm:flex-[0_0_40%] lg:flex-[0_0_28%] aspect-[3/4] rounded-2xl bg-white/5 animate-pulse shrink-0"
           />
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-            <Package className="w-16 h-16 text-white/10" />
-            <span className="text-xs text-white/20">Sem foto</span>
-          </div>
-        )}
-
-        {/* Multi-color badge */}
-        {isMultiColor && (
-          <div className="absolute top-4 left-4 bg-black/70 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center gap-1.5">
-            <span className="flex h-2 w-2 rounded-full bg-gradient-to-r from-red-500 via-yellow-400 to-blue-500" />
-            <span className="text-[10px] font-bold text-white/80 uppercase tracking-wider">Multi-Color</span>
-          </div>
-        )}
+        ))}
       </div>
-
-      {/* Conteúdo */}
-      <div className="flex flex-col flex-1 p-6">
-        {/* Material tag */}
-        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-white/30 mb-2">
-          {primaryMaterial}
-        </span>
-
-        {/* Nome */}
-        <h3 className="text-lg font-semibold text-white/90 group-hover:text-white transition-colors leading-snug mb-2">
-          {displayName}
-        </h3>
-
-        {/* Descrição */}
-        {description && (
-          <p className="text-sm text-white/45 leading-relaxed mb-4 line-clamp-2">
-            {description}
-          </p>
-        )}
-
-        {/* ── Preço + CTA ─────────────────────────────────────────── */}
-        <div className="mt-auto pt-5 border-t border-white/[0.07] flex items-center justify-between gap-4">
-
-          {isDestaque ? (
-            /* ── Ancoragem de Preço (apenas em itens Destaque) ── */
-            <div className="flex flex-col gap-0.5">
-              {/* Falso preço antigo (âncora) */}
-              <p className="text-xs text-white/30 line-through tabular-nums leading-none">
-                De: {formatBRL(fakeOriginalPrice)}
-              </p>
-              {/* Preço real em destaque cromático verde-esmeralda */}
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400/80">
-                  Por apenas
-                </span>
-                <span className="text-2xl font-bold text-emerald-400 tabular-nums drop-shadow-[0_0_8px_rgba(52,211,153,0.35)]">
-                  {formatBRL(effectivePrice)}
-                </span>
-              </div>
-              {/* Badge de economia */}
-              <span className="inline-flex w-fit items-center bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold px-2 py-0.5 rounded-full mt-0.5">
-                Economia de {formatBRL(fakeOriginalPrice - effectivePrice)}
-              </span>
-            </div>
-          ) : (
-            /* ── Preço limpo (itens sem destaque) ── */
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/30 mb-0.5">
-                a partir de
-              </p>
-              <p className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-white/70 tabular-nums">
-                {formatBRL(effectivePrice)}
-              </p>
-            </div>
-          )}
-
-          {/* Botão Adicionar ao Carrinho */}
-          <button
-            onClick={handleAddToCart}
-            disabled={added}
-            className={`group/btn shrink-0 h-12 px-5 rounded-full font-semibold text-sm active:scale-[0.97] transition-all duration-300 flex items-center gap-2 ${
-              added
-                ? "bg-emerald-500 text-white shadow-[0_0_20px_rgba(52,211,153,0.3)] cursor-default"
-                : "bg-gradient-to-r from-orange-500 to-rose-500 text-white hover:opacity-90 shadow-[0_0_20px_rgba(249,115,22,0.2)]"
-            }`}
-          >
-            {added ? (
-              <>
-                <span className="text-base leading-none">✓</span>
-                Adicionado!
-              </>
-            ) : (
-              <>
-                <ShoppingBag className="w-4 h-4 transition-transform group-hover/btn:-translate-y-0.5" />
-                Eu Quero
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-
-function ProductSkeleton() {
-  return (
-    <div className="flex flex-col bg-white/[0.02] border border-white/[0.05] rounded-3xl overflow-hidden">
-      <div className="w-full aspect-[4/3] bg-white/5 animate-pulse" />
-      <div className="p-6 space-y-3">
-        <div className="h-3 w-16 bg-white/5 rounded-full animate-pulse" />
-        <div className="h-5 w-3/4 bg-white/8 rounded-full animate-pulse" />
-        <div className="h-4 w-full bg-white/5 rounded-full animate-pulse" />
-        <div className="h-4 w-2/3 bg-white/5 rounded-full animate-pulse" />
-        <div className="h-px bg-white/5 my-2" />
-        <div className="flex items-center justify-between pt-2">
-          <div className="h-7 w-24 bg-white/8 rounded-full animate-pulse" />
-          <div className="h-12 w-32 bg-white/5 rounded-full animate-pulse" />
-        </div>
-      </div>
+      <div className="h-px bg-white/[0.05]" />
     </div>
   );
 }
 
 function StoreCatalog({ catalogRef }: { catalogRef: React.RefObject<HTMLElement | null> }) {
-  const [items, setItems] = useState<CatalogItem[]>([]);
+  const [allItems, setAllItems] = useState<CatalogItem[]>([]);
+  const [collections, setCollections] = useState<Collection[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    // Cargas independentes: coleções que falham não bloqueiam os produtos
     getStoreItems()
-      .then(setItems)
+      .then(setAllItems)
       .catch(() => setError(true))
       .finally(() => setLoading(false));
+
+    getActiveCollections()
+      .then(setCollections)
+      .catch((err) =>
+        console.warn("Collections not loaded:", err)
+      );
   }, []);
+
+  // Agrupa produtos por coleção (coleções em destaque primeiro, depois por ordem)
+  const groups = useMemo((): CategoryGroup[] => {
+    const sortedCols = [...collections].sort((a, b) =>
+      a.em_destaque === b.em_destaque ? a.ordem - b.ordem : a.em_destaque ? -1 : 1
+    );
+
+    const result: CategoryGroup[] = sortedCols
+      .map((col) => ({
+        collection: col,
+        items: allItems.filter((i) => i.collectionId === col.id),
+      }))
+      .filter((g) => g.items.length > 0); // omite coleções sem produtos na loja
+
+    // Grupo "Geral" para itens sem coleção (ao final)
+    const generalItems = allItems.filter(
+      (i) => !i.collectionId || !collections.find((c) => c.id === i.collectionId)
+    );
+    if (generalItems.length > 0) {
+      result.push({ collection: null, items: generalItems });
+    }
+
+    return result;
+  }, [allItems, collections]);
 
   return (
     <section ref={catalogRef} id="catalogo" className="py-20 px-5 sm:px-8 max-w-7xl mx-auto">
-      {/* Section header */}
+      {/* Cabeçalho da seção */}
       <div className="text-center mb-14">
         <div className="inline-flex items-center gap-2 text-orange-400 text-xs font-bold uppercase tracking-widest mb-4">
           <Sparkles className="w-4 h-4" />
@@ -475,22 +360,22 @@ function StoreCatalog({ catalogRef }: { catalogRef: React.RefObject<HTMLElement 
           <Sparkles className="w-4 h-4" />
         </div>
         <h2 className="text-4xl sm:text-5xl font-bold text-white mb-4">
-          Escolha o seu favorito
+          Nossas Coleções
         </h2>
         <p className="text-white/40 max-w-md mx-auto text-base">
-          Cada peça é fabricada por encomenda com atenção aos detalhes.
+          Clique em uma coleção para ver todos os produtos. Cada peça é feita por encomenda.
         </p>
       </div>
 
-      {/* Grid */}
+      {/* Loading */}
       {loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <ProductSkeleton key={i} />
-          ))}
+        <div className="space-y-2">
+          <CategorySkeleton />
+          <CategorySkeleton />
         </div>
       )}
 
+      {/* Erro */}
       {!loading && error && (
         <div className="text-center py-20 text-white/30">
           <Package className="w-12 h-12 mx-auto mb-4 opacity-30" />
@@ -498,7 +383,8 @@ function StoreCatalog({ catalogRef }: { catalogRef: React.RefObject<HTMLElement 
         </div>
       )}
 
-      {!loading && !error && items.length === 0 && (
+      {/* Catálogo vazio */}
+      {!loading && !error && allItems.length === 0 && (
         <div className="text-center py-24 text-white/30">
           <Package className="w-16 h-16 mx-auto mb-6 opacity-20" />
           <h3 className="text-xl font-semibold mb-2">Em breve!</h3>
@@ -517,10 +403,14 @@ function StoreCatalog({ catalogRef }: { catalogRef: React.RefObject<HTMLElement 
         </div>
       )}
 
-      {!loading && !error && items.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {items.map((item) => (
-            <ProductCard key={item.id} item={item} />
+      {/* Grupos de coleção */}
+      {!loading && !error && groups.length > 0 && (
+        <div className="space-y-2">
+          {groups.map((group, idx) => (
+            <ExpandableCategory
+              key={group.collection?.id ?? "__general__"}
+              group={group}
+            />
           ))}
         </div>
       )}
@@ -529,6 +419,7 @@ function StoreCatalog({ catalogRef }: { catalogRef: React.RefObject<HTMLElement 
 }
 
 function FaqSection() {
+
   return (
     <section className="py-20 px-5 sm:px-8 max-w-3xl mx-auto">
       <div className="text-center mb-12">

@@ -53,11 +53,34 @@ export interface CatalogItem {
   descricao_venda?: string;
   /** Destaque na vitrine (aparece primeiro, badge especial) */
   destaque?: boolean;
-  /** Preço de venda na loja pública (sobrepõe calculated_price na vitrine) */
+  /** Preço de venda na loja pública (sopõe calculated_price na vitrine) */
   preco_venda_loja?: number;
+  /** ID da Coleção (categoria) associada */
+  collectionId?: string;
 }
 
 export type NewCatalogItem = Omit<CatalogItem, "id">;
+
+// =====================================================
+// COLLECTION TYPES (Categorias / Coleções)
+// =====================================================
+
+export interface Collection {
+  id: string;
+  /** Nome exibido na vitrine e no admin (ex: "Dia das Mães") */
+  nome: string;
+  /** Slug para URL (ex: "dia-das-maes") */
+  slug: string;
+  /** Ordem de exibição (menor = primeiro) */
+  ordem: number;
+  /** Se false, não aparece na vitrine nem no filtro */
+  ativo: boolean;
+  /** Exibe antes das demais com estilo diferenciado */
+  em_destaque: boolean;
+  created_at: Timestamp;
+}
+
+export type NewCollection = Omit<Collection, "id">;
 
 // =====================================================
 // INVENTORY TYPES (peças impressas para pronta entrega)
@@ -126,6 +149,22 @@ export interface SelectedFilamentUsage {
   weight_grams: number;
 }
 
+/**
+ * Uma linha de produto dentro de um pedido multi-item.
+ * Cada linha armazena os custos unitários calculados no momento da criação
+ * para preservar o histórico mesmo se o catálogo mudar.
+ */
+export interface OrderLineItem {
+  productId: string;
+  nome: string;
+  quantidade: number;
+  preco_unitario: number;
+  custo_material_unitario: number;
+  custo_maquina_unitario: number;
+  /** Tempo de lote calculado (minutos) */
+  batch_time_minutes?: number;
+}
+
 export interface Order {
   id: string;
   instagram_handle: string;
@@ -150,12 +189,16 @@ export interface Order {
   assigned_from_inventory?: boolean;
   /** Origem do pedido: 'admin' (painel) | 'site' (vitrine pública) */
   origem?: "admin" | "site";
-  /** Nome do cliente (pedidos vindos do site) */
+  /** Nome do cliente */
   cliente_nome?: string;
   /** Telefone do cliente (pedidos vindos do site) */
   cliente_telefone?: string;
-  /** Itens do carrinho (pedidos vindos do site) */
+  /** Itens do carrinho (pedidos vindos do site — formato legado) */
   cart_items?: CartItem[];
+  /** Linhas de produto do pedido multi-item (novo formato admin + site) */
+  items?: OrderLineItem[];
+  /** Código curto gerado no site para facilitar identificação (ex: A7F2) */
+  shortCode?: string;
   payment_status: PaymentStatus;
   production_status: ProductionStatus;
   created_at: Timestamp;
@@ -194,6 +237,7 @@ export interface StoreOrder {
   piece_name: string;
   material: string;
   price: number;
+  shortCode?: string;
 }
 
 // =====================================================
