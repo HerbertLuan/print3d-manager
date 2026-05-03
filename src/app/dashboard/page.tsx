@@ -477,7 +477,7 @@ export default function DashboardPage() {
                   </Table>
                   <div className="flex justify-end items-center px-6 py-3 border-t border-border bg-muted/20">
                     <span className="text-sm font-semibold text-muted-foreground mr-4">Total do Período:</span>
-                    <span className="text-lg font-bold text-red-400 tabular-nums">{formatBRL(stats.expensesCost)}</span>
+                    <span className="text-lg font-bold text-red-400 tabular-nums">{formatBRL(filteredExpenses.reduce((acc, curr) => acc + curr.value, 0))}</span>
                   </div>
                 </div>
               )}
