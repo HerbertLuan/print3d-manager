@@ -18,9 +18,49 @@ import {
   ShoppingCart,
   CheckCircle2,
   Package,
+  Gift,
 } from "lucide-react";
 
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "5561985592709";
+const GIFT_THRESHOLD = 150; // R$ para ganhar brinde exclusivo
+
+// ─── GiftProgressBar ──────────────────────────────────────────────────────────
+
+function GiftProgressBar({ total }: { total: number }) {
+  const pct = Math.min(100, (total / GIFT_THRESHOLD) * 100);
+  const remaining = Math.max(0, GIFT_THRESHOLD - total);
+  const earned = pct >= 100;
+
+  return (
+    <div className="rounded-xl border border-[#7C3AED]/20 bg-[#7C3AED]/5 px-4 py-3 space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Gift className="size-3.5 text-[#7C3AED]" />
+          <p className="text-xs font-semibold text-white/80">
+            {earned ? (
+              <span className="text-[#FACC15]">🎁 Brinde exclusivo desbloqueado!</span>
+            ) : (
+              <>
+                Faltam{" "}
+                <span className="text-white font-bold">
+                  {formatBRL(remaining)}
+                </span>{" "}
+                para um brinde exclusivo
+              </>
+            )}
+          </p>
+        </div>
+        <span className="text-[10px] text-white/30 tabular-nums">{Math.round(pct)}%</span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-[#2563EB] to-[#7C3AED] transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
 
 // ─── CartSheet (Sheet lateral direito) ───────────────────────────────────────
 
@@ -286,6 +326,25 @@ export function CartSheet() {
 
             {/* Rodapé — Total + Formulário + Botão */}
             <div className="border-t border-white/[0.07] px-5 py-5 space-y-4 bg-[#0a0a0f]">
+
+              {/* Banner de Retirada em Mãos */}
+              <div className="flex items-center gap-3 rounded-xl border border-[#2563EB]/20 bg-[#2563EB]/5 px-4 py-3">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#2563EB] to-[#7C3AED] text-sm">
+                  📍
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-white/90">
+                    Retirada em Mãos
+                  </p>
+                  <p className="text-[11px] text-white/40 leading-tight">
+                    Combinamos a entrega pelo WhatsApp — Brasília / DF
+                  </p>
+                </div>
+              </div>
+
+              {/* Barra de Brinde (ticket médio) */}
+              <GiftProgressBar total={total} />
+
               {/* Total */}
               <div className="flex items-center justify-between">
                 <span className="text-sm text-white/50">Total</span>
@@ -294,7 +353,7 @@ export function CartSheet() {
                 </span>
               </div>
 
-              {/* Botão Finalizar imediato */}
+              {/* Botão Finalizar */}
               <button
                 type="submit"
                 disabled={loading || items.length === 0}

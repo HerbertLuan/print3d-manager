@@ -140,7 +140,7 @@ export function ExpandableCategory({ group }: { group: CategoryGroup }) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 8 }}
               transition={{ duration: 0.3, delay: 0.1 }}
-              className="grid grid-cols-1 gap-6 pb-6 sm:grid-cols-2 lg:grid-cols-3"
+              className="grid grid-cols-2 gap-4 pb-6 sm:grid-cols-3 lg:grid-cols-4"
             >
               {items.map((item) => (
                 <ProductCard key={item.id} item={item} />

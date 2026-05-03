@@ -22,7 +22,7 @@ export default function PublicLayout({
 }) {
   return (
     <html lang="pt-BR" className="dark scroll-smooth">
-      <body className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased">
+      <body className="min-h-screen overflow-x-hidden bg-[#0D0D0D] text-[#F2F2F2] antialiased">
         {children}
         <Toaster
           theme="dark"
