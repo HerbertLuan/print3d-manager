@@ -245,7 +245,7 @@ export function ExpenseForm({ open, onOpenChange, onSaved, expenseToEdit }: Expe
                   <Settings className="h-3.5 w-3.5" />
                 </Button>
               </Label>
-              <Select value={category} onValueChange={setCategory}>
+              <Select value={category} onValueChange={(v) => v && setCategory(v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
