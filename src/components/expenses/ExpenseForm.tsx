@@ -210,17 +210,19 @@ export function ExpenseForm({ open, onOpenChange, onSaved, expenseToEdit }: Expe
             <div className="space-y-2">
               <Label>Data</Label>
               <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full justify-start text-left font-normal h-10",
-                      !date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
-                  </Button>
+                <PopoverTrigger
+                  render={
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal h-10",
+                        !date && "text-muted-foreground"
+                      )}
+                    />
+                  }
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date ? format(date, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
@@ -286,17 +288,19 @@ export function ExpenseForm({ open, onOpenChange, onSaved, expenseToEdit }: Expe
               <div className="space-y-2">
                 <Label>Data de Pagamento</Label>
                 <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-full justify-start text-left font-normal h-10",
-                        !paidAt && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {paidAt ? format(paidAt, "PPP", { locale: ptBR }) : <span>Selecione</span>}
-                    </Button>
+                  <PopoverTrigger
+                    render={
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-full justify-start text-left font-normal h-10",
+                          !paidAt && "text-muted-foreground"
+                        )}
+                      />
+                    }
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {paidAt ? format(paidAt, "PPP", { locale: ptBR }) : <span>Selecione</span>}
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
