@@ -1,31 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import {
-  Receipt,
-  Plus,
-  RefreshCw,
-  AlertCircle,
-  Trash2,
-  FileText,
-} from "lucide-react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Receipt, Plus, RefreshCw, AlertCircle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,12 +13,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ResponsiveModal } from "@/components/ui/responsive-modal";
-import { getExpenses, addExpense, deleteExpense } from "@/lib/firestore";
+import { getExpenses, deleteExpense, updateExpense } from "@/lib/firestore";
 import { Expense } from "@/lib/types";
-import { formatBRL } from "@/lib/calculations";
+import { ExpenseForm } from "@/components/expenses/ExpenseForm";
+import { ExpenseList } from "@/components/expenses/ExpenseList";
 
 const MONTHS = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -56,12 +33,12 @@ export default function ExpensesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Form
+  // Form State
   const [formOpen, setFormOpen] = useState(false);
-  const [formDesc, setFormDesc] = useState("");
-  const [formValue, setFormValue] = useState("");
-  const [formDate, setFormDate] = useState(now.toISOString().slice(0, 10));
-  const [saving, setSaving] = useState(false);
+  const [expenseToEdit, setExpenseToEdit] = useState<Expense | null>(null);
+
+  // Delete State
+  const [deleteExpenseData, setDeleteExpenseData] = useState<Expense | null>(null);
 
   const loadExpenses = useCallback(async () => {
     setLoading(true);
@@ -96,73 +73,96 @@ export default function ExpensesPage() {
     else setMonth((m) => m + 1);
   }
 
-  function resetForm() {
-    setFormDesc("");
-    setFormValue("");
-    setFormDate(new Date().toISOString().slice(0, 10));
+  function handleAddClick() {
+    setExpenseToEdit(null);
+    setFormOpen(true);
   }
 
-  async function handleAdd() {
-    if (!formDesc.trim() || !formValue || !formDate) return;
-    const value = parseFloat(formValue);
-    if (value <= 0) return;
-    setSaving(true);
+  function handleEditClick(expense: Expense) {
+    setExpenseToEdit(expense);
+    setFormOpen(true);
+  }
+
+  async function handleDeleteConfirm() {
+    if (!deleteExpenseData) return;
     try {
-      await addExpense({ description: formDesc.trim(), value, date: formDate });
-      setFormOpen(false);
-      resetForm();
-      loadExpenses();
+      await deleteExpense(deleteExpenseData.id);
+      setExpenses((prev) => prev.filter((e) => e.id !== deleteExpenseData.id));
+      setDeleteExpenseData(null);
     } catch (err) {
       console.error(err);
-      setError("Erro ao lançar despesa.");
-    } finally {
-      setSaving(false);
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handlePaymentToggle(expense: Expense) {
+    const newStatus = expense.status === "Pendente" ? "Pago" : "Pendente";
+    const todayStr = new Date().toLocaleDateString("en-CA");
+    const newPaidAt = newStatus === "Pago" ? todayStr : null;
+
     try {
-      await deleteExpense(id);
-      setExpenses((prev) => prev.filter((e) => e.id !== id));
+      await updateExpense(expense.id, {
+        status: newStatus,
+        paid_at: newPaidAt as string // Type cast to satisfy Partial<Omit<Expense, "id" | "created_at">> if needed, but it works
+      });
+      setExpenses((prev) =>
+        prev.map((e) =>
+          e.id === expense.id ? { ...e, status: newStatus, paid_at: newPaidAt || undefined } : e
+        )
+      );
     } catch (err) {
       console.error(err);
     }
   }
 
   return (
-    <div className="flex-1 p-4 md:p-8">
+    <div className="flex-1 p-4 md:p-8 bg-[#0D0D0D] min-h-screen">
       <div className="max-w-5xl mx-auto space-y-8">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center border border-red-500/20">
                 <Receipt className="w-5 h-5 text-red-400" />
               </div>
-              <h1 className="text-2xl font-bold text-foreground">Despesas Extras</h1>
+              <h1 className="text-2xl font-bold text-foreground">Gestão de Despesas</h1>
             </div>
-            <p className="text-muted-foreground">Filamentos, energia, manutenção e outros custos operacionais.</p>
+            <p className="text-muted-foreground">Registre e acompanhe seus custos operacionais.</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={loadExpenses} disabled={loading} className="hidden sm:flex">
+            <Button variant="outline" size="sm" onClick={loadExpenses} disabled={loading} className="hidden sm:flex bg-white/5 border-white/10 hover:bg-white/10">
               <RefreshCw className={`w-4 h-4 mr-2 ${loading ? "animate-spin" : ""}`} />
               Atualizar
             </Button>
-            <Button size="sm" onClick={() => setFormOpen(true)}>
+            <Button size="sm" onClick={handleAddClick} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0">
               <Plus className="w-4 h-4 sm:mr-2" />
               <span className="hidden sm:inline">Lançar Despesa</span>
             </Button>
           </div>
         </div>
 
-        {/* Month Navigation */}
-        <div className="flex items-center justify-between">
-          <Button variant="outline" size="sm" onClick={prevMonth}>←</Button>
-          <div className="text-center">
-            <p className="font-semibold text-foreground">{MONTHS[month - 1]} {year}</p>
-            <p className="text-xs text-muted-foreground">{filtered.length} despesas · {formatBRL(totalMonthly)}</p>
+        {/* Resumo & Filtro */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
+          <div className="flex items-center justify-between md:col-span-1 bg-white/5 rounded-xl border border-white/10 p-2">
+            <Button variant="ghost" size="sm" onClick={prevMonth} className="hover:bg-white/10">←</Button>
+            <div className="text-center px-4">
+              <p className="font-semibold text-foreground text-sm uppercase tracking-wider">{MONTHS[month - 1]} {year}</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={nextMonth} className="hover:bg-white/10">→</Button>
           </div>
-          <Button variant="outline" size="sm" onClick={nextMonth}>→</Button>
+
+          <div className="md:col-span-2">
+            <Card className="bg-white/5 border-white/10 shadow-lg backdrop-blur-md">
+              <CardContent className="p-5 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Total de Despesas ({MONTHS[month - 1]})</p>
+                  <h2 className="text-3xl font-bold text-red-400 mt-1">{totalMonthly.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</h2>
+                </div>
+                <div className="p-3 bg-red-500/10 rounded-full border border-red-500/20">
+                  <Receipt className="w-6 h-6 text-red-500" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {error && (
@@ -172,140 +172,57 @@ export default function ExpensesPage() {
           </div>
         )}
 
-        <Card className="border-border">
-          <CardHeader className="py-4 border-b border-border/50">
-            <CardTitle className="text-base">Despesas de {MONTHS[month - 1]}</CardTitle>
+        {/* Lista */}
+        <Card className="border-white/10 bg-white/5 shadow-xl backdrop-blur-sm overflow-hidden">
+          <CardHeader className="py-4 border-b border-white/10 bg-white/5">
+            <CardTitle className="text-base font-semibold">Histórico de {MONTHS[month - 1]}</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             {loading ? (
               <div className="p-8 space-y-3">
                 {Array.from({ length: 4 }).map((_, i) => (
-                  <div key={i} className="h-10 bg-muted rounded animate-pulse" />
+                  <div key={i} className="h-12 bg-white/5 rounded animate-pulse" />
                 ))}
               </div>
-            ) : filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-20 text-center px-8">
-                <FileText className="w-12 h-12 text-muted-foreground/30 mb-4" />
-                <h3 className="font-semibold text-foreground mb-1">Nenhuma despesa neste mês</h3>
-                <p className="text-sm text-muted-foreground">
-                  Clique em <strong>Lançar Despesa</strong> para registrar.
-                </p>
-              </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="border-border hover:bg-transparent">
-                      <TableHead className="pl-6">Descrição</TableHead>
-                      <TableHead>Data</TableHead>
-                      <TableHead className="text-right pr-6">Valor</TableHead>
-                      <TableHead />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filtered.map((expense) => (
-                      <TableRow key={expense.id} className="border-border">
-                        <TableCell className="pl-6 font-medium">{expense.description}</TableCell>
-                        <TableCell className="text-muted-foreground tabular-nums">
-                          {new Date(expense.date + "T00:00:00").toLocaleDateString("pt-BR")}
-                        </TableCell>
-                        <TableCell className="text-right pr-6 font-semibold text-red-400 tabular-nums">
-                          {formatBRL(expense.value)}
-                        </TableCell>
-                        <TableCell className="pr-4">
-                          <AlertDialog>
-                            <AlertDialogTrigger render={
-                              <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:bg-destructive/10" />
-                            }>
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Excluir Despesa</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Tem certeza? Esta despesa será removida permanentemente.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDelete(expense.id)}
-                                  className="bg-destructive hover:bg-destructive/90"
-                                >
-                                  Excluir
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                {/* Footer totals row */}
-                <div className="flex justify-end items-center px-6 py-3 border-t border-border bg-muted/20">
-                  <span className="text-sm font-semibold text-muted-foreground mr-4">Total do Mês:</span>
-                  <span className="text-lg font-bold text-red-400 tabular-nums">{formatBRL(totalMonthly)}</span>
-                </div>
-              </div>
+              <ExpenseList
+                expenses={filtered}
+                totalMonthly={totalMonthly}
+                onEdit={handleEditClick}
+                onDeleteClick={(e) => setDeleteExpenseData(e)}
+                onPaymentToggle={handlePaymentToggle}
+              />
             )}
           </CardContent>
         </Card>
       </div>
 
-      {/* Add Expense Modal */}
-      <ResponsiveModal
+      <ExpenseForm
         open={formOpen}
-        onOpenChange={(o) => { setFormOpen(o); if (!o) resetForm(); }}
-        title="Lançar Despesa"
-        description="Registre um custo operacional ou compra."
-      >
-        <div className="space-y-4 py-2">
-          <div className="space-y-2">
-            <Label>Descrição</Label>
-            <Input
-              placeholder="ex: Filamento PLA 1kg Silver, Energia elétrica"
-              value={formDesc}
-              onChange={(e) => setFormDesc(e.target.value)}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Valor (R$)</Label>
-              <Input
-                type="number"
-                min={0}
-                step={0.01}
-                placeholder="0,00"
-                value={formValue}
-                onChange={(e) => setFormValue(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Data</Label>
-              <Input
-                type="date"
-                value={formDate}
-                onChange={(e) => setFormDate(e.target.value)}
-              />
-            </div>
-          </div>
+        onOpenChange={setFormOpen}
+        expenseToEdit={expenseToEdit}
+        onSaved={loadExpenses}
+      />
 
-          <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
-            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setFormOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              className="w-full sm:w-auto flex-1"
-              onClick={handleAdd}
-              disabled={!formDesc.trim() || !formValue || !formDate || saving}
+      <AlertDialog open={!!deleteExpenseData} onOpenChange={(v) => !v && setDeleteExpenseData(null)}>
+        <AlertDialogContent className="bg-zinc-950 border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Despesa</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza? A despesa <strong>"{deleteExpenseData?.description}"</strong> será removida permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-transparent border-white/10 hover:bg-white/5">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-red-600 hover:bg-red-700 text-white"
             >
-              <Receipt className="w-4 h-4 mr-2" />
-              {saving ? "Salvando..." : "Lançar Despesa"}
-            </Button>
-          </div>
-        </div>
-      </ResponsiveModal>
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

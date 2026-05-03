@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { getOrders, getExpenses, addExpense, deleteExpense } from "@/lib/firestore";
+import { getOrders, getExpenses, deleteExpense } from "@/lib/firestore";
 import { Order, Expense } from "@/lib/types";
-import { formatBRL, formatTime } from "@/lib/calculations";
+import { formatBRL } from "@/lib/calculations";
 import {
   LayoutDashboard,
   TrendingUp,
@@ -21,13 +21,10 @@ import {
   Receipt,
   Trash2,
   FileText,
-  AlertCircle,
+  ListOrdered,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ResponsiveModal } from "@/components/ui/responsive-modal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,6 +43,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { ExpenseForm } from "@/components/expenses/ExpenseForm";
+import { OrderDetailsModal } from "@/components/dashboard/OrderDetailsModal";
 
 const MONTH_NAMES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -63,17 +62,17 @@ export default function DashboardPage() {
   const [viewYear, setViewYear] = useState(now.getFullYear());
   const [viewMonth, setViewMonth] = useState(now.getMonth() + 1); // 1-based
   const [allPeriod, setAllPeriod] = useState(false);
+  const [accountingMode, setAccountingMode] = useState<"Caixa" | "Competência">("Caixa");
 
   // Expense form
   const [expenseFormOpen, setExpenseFormOpen] = useState(false);
-  const [formDesc, setFormDesc] = useState("");
-  const [formValue, setFormValue] = useState("");
-  const [formDate, setFormDate] = useState(now.toISOString().slice(0, 10));
-  const [savingExpense, setSavingExpense] = useState(false);
-  const [expenseError, setExpenseError] = useState<string | null>(null);
+  const [expenseToEdit, setExpenseToEdit] = useState<Expense | null>(null);
 
   // Expense delete confirm
   const [deleteExpenseData, setDeleteExpenseData] = useState<Expense | null>(null);
+
+  // Order Details modal
+  const [orderDetailsOpen, setOrderDetailsOpen] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -106,72 +105,112 @@ export default function DashboardPage() {
   const currentMonthStr = `${viewYear}-${String(viewMonth).padStart(2, "0")}`;
 
   const stats = useMemo(() => {
-    const s = {
-      revenue: 0,
-      filamentCost: 0,
-      machineCost: 0,
-      suppliesCost: 0,
-      expensesCost: 0,
-      orderCount: 0,
-    };
+    let revenue = 0;
+    let provFilamento = 0;
+    let provMaquina = 0;
+    let provInsumo = 0;
+    let orderCount = 0;
 
     orders.forEach(o => {
-      const orderDate = new Date(o.created_at.seconds * 1000);
-      const mStr = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, "0")}`;
+      let mStr;
+      if (accountingMode === "Caixa") {
+        if (o.payment_status !== "Pago") return; // Regime de Caixa ignora pendentes
+        const dateStr = o.paid_at || new Date(o.created_at.seconds * 1000).toLocaleDateString("en-CA");
+        mStr = dateStr.substring(0, 7);
+      } else {
+        const orderDate = new Date(o.created_at.seconds * 1000);
+        mStr = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, "0")}`;
+      }
+
       const inPeriod = allPeriod || mStr === currentMonthStr;
       if (!inPeriod) return;
 
-      s.revenue += Number(o.price) || 0;
-      s.filamentCost += Number(o.filament_cost) || 0;
-      s.machineCost += Number(o.machine_cost) || 0;
-      s.suppliesCost += Number(o.supplies_cost) || 0;
-      s.orderCount++;
+      revenue += Number(o.price) || 0;
+      provFilamento += Number(o.filament_cost) || 0;
+      provMaquina += Number(o.machine_cost) || 0;
+      provInsumo += Number(o.supplies_cost) || 0;
+      orderCount++;
     });
+
+    let realFilamento = 0;
+    let realMaquina = 0;
+    let realInsumo = 0;
+    let despesasAvulsas = 0;
 
     expenses.forEach(e => {
-      const dStr = e.date.substring(0, 7);
+      let dStr;
+      if (accountingMode === "Caixa") {
+        if (e.status === "Pendente") return; // Regime de Caixa ignora despesas pendentes
+        dStr = (e.paid_at || e.date).substring(0, 7);
+      } else {
+        dStr = e.date.substring(0, 7);
+      }
+
       const inPeriod = allPeriod || dStr === currentMonthStr;
       if (!inPeriod) return;
-      s.expensesCost += e.value;
+
+      const cat = (e.categoria || "").toLowerCase();
+      
+      if (cat.includes("filamento")) {
+        realFilamento += e.value;
+      } else if (cat.includes("manutenção") || cat.includes("manutencao") || cat.includes("máquina") || cat.includes("maquina")) {
+        realMaquina += e.value;
+      } else if (cat.includes("insumo") || cat.includes("embalagem")) {
+        realInsumo += e.value;
+      } else {
+        despesasAvulsas += e.value;
+      }
     });
 
-    const totalOperationalCost = s.filamentCost + s.machineCost + s.suppliesCost;
-    const totalCosts = totalOperationalCost + s.expensesCost;
-    const profit = s.revenue - totalCosts;
+    const deficitFilamento = Math.max(0, realFilamento - provFilamento);
+    const deficitMaquina = Math.max(0, realMaquina - provMaquina);
+    const deficitInsumo = Math.max(0, realInsumo - provInsumo);
 
-    return { ...s, totalOperationalCost, totalCosts, profit };
-  }, [orders, expenses, currentMonthStr, allPeriod]);
+    const totalOperationalCost = provFilamento + provMaquina + provInsumo;
+    const profit = revenue - totalOperationalCost - despesasAvulsas - (deficitFilamento + deficitMaquina + deficitInsumo);
+
+    return { 
+      revenue, 
+      orderCount,
+      provFilamento,
+      provMaquina,
+      provInsumo,
+      realFilamento,
+      realMaquina,
+      realInsumo,
+      despesasAvulsas,
+      totalOperationalCost, 
+      profit 
+    };
+  }, [orders, expenses, currentMonthStr, allPeriod, accountingMode]);
+
+  // Orders filtered for the details modal
+  const filteredOrders = useMemo(() => {
+    return orders.filter(o => {
+      let mStr;
+      if (accountingMode === "Caixa") {
+        if (o.payment_status !== "Pago") return false;
+        const dateStr = o.paid_at || new Date(o.created_at.seconds * 1000).toLocaleDateString("en-CA");
+        mStr = dateStr.substring(0, 7);
+      } else {
+        const orderDate = new Date(o.created_at.seconds * 1000);
+        mStr = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, "0")}`;
+      }
+      return allPeriod || mStr === currentMonthStr;
+    });
+  }, [orders, currentMonthStr, allPeriod, accountingMode]);
 
   // Expenses filtered for the table below
   const filteredExpenses = useMemo(() => {
     if (allPeriod) return expenses;
-    return expenses.filter(e => e.date.substring(0, 7) === currentMonthStr);
-  }, [expenses, currentMonthStr, allPeriod]);
-
-  function resetForm() {
-    setFormDesc("");
-    setFormValue("");
-    setFormDate(new Date().toISOString().slice(0, 10));
-    setExpenseError(null);
-  }
-
-  async function handleAddExpense() {
-    if (!formDesc.trim() || !formValue || !formDate) return;
-    const value = parseFloat(formValue);
-    if (value <= 0) return;
-    setSavingExpense(true);
-    try {
-      await addExpense({ description: formDesc.trim(), value, date: formDate });
-      setExpenseFormOpen(false);
-      resetForm();
-      fetchData();
-    } catch (err) {
-      console.error(err);
-      setExpenseError("Erro ao lançar despesa.");
-    } finally {
-      setSavingExpense(false);
-    }
-  }
+    return expenses.filter(e => {
+      if (accountingMode === "Caixa") {
+        if (e.status === "Pendente") return false;
+        return (e.paid_at || e.date).substring(0, 7) === currentMonthStr;
+      }
+      return e.date.substring(0, 7) === currentMonthStr;
+    });
+  }, [expenses, currentMonthStr, allPeriod, accountingMode]);
 
   async function handleDeleteExpense() {
     if (!deleteExpenseData) return;
@@ -185,6 +224,11 @@ export default function DashboardPage() {
   }
 
   const margin = stats.revenue > 0 ? (stats.profit / stats.revenue) * 100 : 0;
+
+  function handleAddExpenseClick() {
+    setExpenseToEdit(null);
+    setExpenseFormOpen(true);
+  }
 
   if (loading) {
     return (
@@ -217,7 +261,7 @@ export default function DashboardPage() {
               <p className="text-muted-foreground text-sm">Acompanhe a saúde financeira e estude seus custos reais.</p>
             </div>
           </div>
-          <Button size="sm" onClick={() => setExpenseFormOpen(true)} className="gap-2 self-start sm:self-auto">
+          <Button size="sm" onClick={handleAddExpenseClick} className="gap-2 self-start sm:self-auto bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white border-0">
             <Plus className="w-4 h-4" />
             Lançar Despesa
           </Button>
@@ -245,6 +289,38 @@ export default function DashboardPage() {
             <CalendarRange className="w-4 h-4" />
             Todo o Período
           </Button>
+
+          <div className="flex-1" />
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOrderDetailsOpen(true)}
+            className="gap-2 bg-black/40 border-white/10 hover:bg-black/60 text-white backdrop-blur-sm shadow-sm"
+          >
+            <ListOrdered className="w-4 h-4" />
+            Ver Pedidos do Período
+          </Button>
+
+          {/* Toggle Accounting Mode */}
+          <div className="flex items-center bg-muted/30 border border-border rounded-lg p-1">
+            <Button
+              variant={accountingMode === "Competência" ? "secondary" : "ghost"}
+              size="sm"
+              className={`h-7 px-3 text-xs ${accountingMode === "Competência" ? "shadow-sm" : "opacity-70 hover:opacity-100"}`}
+              onClick={() => setAccountingMode("Competência")}
+            >
+              Competência
+            </Button>
+            <Button
+              variant={accountingMode === "Caixa" ? "secondary" : "ghost"}
+              size="sm"
+              className={`h-7 px-3 text-xs ${accountingMode === "Caixa" ? "shadow-sm" : "opacity-70 hover:opacity-100"}`}
+              onClick={() => setAccountingMode("Caixa")}
+            >
+              Caixa
+            </Button>
+          </div>
         </div>
 
         {/* KPIs */}
@@ -298,8 +374,8 @@ export default function DashboardPage() {
                   <TrendingDown className="w-4 h-4 text-red-500" />
                 </div>
               </div>
-              <h2 className="text-3xl font-bold text-foreground">{formatBRL(stats.expensesCost)}</h2>
-              <p className="text-xs text-muted-foreground mt-1">Luz extra, Manutenção, etc</p>
+              <h2 className="text-3xl font-bold text-foreground">{formatBRL(stats.despesasAvulsas)}</h2>
+              <p className="text-xs text-muted-foreground mt-1">Custos não atrelados à operação</p>
             </CardContent>
           </Card>
         </div>
@@ -308,29 +384,29 @@ export default function DashboardPage() {
         <div>
           <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
             <PieChart className="w-5 h-5 text-muted-foreground" />
-            Distribuição de Custos Operacionais
+            Fundos de Provisão vs Realizado
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <CostCard
               icon={<Droplet className="w-3 h-3" />}
               label="Bobinas de Filamento"
               color="blue"
-              value={stats.filamentCost}
-              total={stats.totalOperationalCost}
+              provValue={stats.provFilamento}
+              realValue={stats.realFilamento}
             />
             <CostCard
               icon={<Zap className="w-3 h-3" />}
               label="Depreciação de Máquina"
               color="orange"
-              value={stats.machineCost}
-              total={stats.totalOperationalCost}
+              provValue={stats.provMaquina}
+              realValue={stats.realMaquina}
             />
             <CostCard
               icon={<Tag className="w-3 h-3" />}
               label="Insumos / Embalagens"
               color="purple"
-              value={stats.suppliesCost}
-              total={stats.totalOperationalCost}
+              provValue={stats.provInsumo}
+              realValue={stats.realInsumo}
             />
           </div>
         </div>
@@ -342,7 +418,7 @@ export default function DashboardPage() {
               <Receipt className="w-5 h-5 text-muted-foreground" />
               Despesas do Período
             </h3>
-            <Button variant="outline" size="sm" onClick={() => setExpenseFormOpen(true)} className="gap-2">
+            <Button variant="outline" size="sm" onClick={handleAddExpenseClick} className="gap-2">
               <Plus className="w-4 h-4" />
               <span className="hidden sm:inline">Nova Despesa</span>
             </Button>
@@ -361,6 +437,7 @@ export default function DashboardPage() {
                     <TableHeader>
                       <TableRow className="border-border hover:bg-transparent">
                         <TableHead className="pl-6">Descrição</TableHead>
+                        <TableHead>Categoria</TableHead>
                         <TableHead>Data</TableHead>
                         <TableHead className="text-right pr-6">Valor</TableHead>
                         <TableHead />
@@ -368,15 +445,23 @@ export default function DashboardPage() {
                     </TableHeader>
                     <TableBody>
                       {filteredExpenses.map((expense) => (
-                        <TableRow key={expense.id} className="border-border">
-                          <TableCell className="pl-6 font-medium">{expense.description}</TableCell>
-                          <TableCell className="text-muted-foreground tabular-nums">
+                        <TableRow key={expense.id} className="border-border cursor-pointer hover:bg-muted/50" onClick={() => { setExpenseToEdit(expense); setExpenseFormOpen(true); }}>
+                          <TableCell className="pl-6 font-medium">
+                            {expense.description}
+                            {expense.tipo_cobranca === "Parcelada" && expense.parcelas && (
+                              <span className="ml-2 text-xs text-muted-foreground">({expense.parcelas})</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {expense.categoria || "Outros"}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground tabular-nums text-sm">
                             {new Date(expense.date + "T00:00:00").toLocaleDateString("pt-BR")}
                           </TableCell>
                           <TableCell className="text-right pr-6 font-semibold text-red-400 tabular-nums">
                             {formatBRL(expense.value)}
                           </TableCell>
-                          <TableCell className="pr-4">
+                          <TableCell className="pr-4" onClick={(e) => e.stopPropagation()}>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -402,52 +487,12 @@ export default function DashboardPage() {
 
       </div>
 
-      {/* ── Modal: Lançar Despesa ── */}
-      <ResponsiveModal
+      <ExpenseForm
         open={expenseFormOpen}
-        onOpenChange={(o) => { setExpenseFormOpen(o); if (!o) resetForm(); }}
-        title="Lançar Despesa"
-        description="Registre um custo operacional ou compra."
-      >
-        <div className="space-y-4 py-2">
-          {expenseError && (
-            <div className="bg-destructive/10 border border-destructive/30 text-destructive rounded-lg px-3 py-2 text-sm flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" /> {expenseError}
-            </div>
-          )}
-          <div className="space-y-2">
-            <Label>Descrição</Label>
-            <Input
-              placeholder="ex: Energia elétrica, Manutenção"
-              value={formDesc}
-              onChange={(e) => setFormDesc(e.target.value)}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Valor (R$)</Label>
-              <Input type="number" min={0} step={0.01} placeholder="0,00" value={formValue} onChange={(e) => setFormValue(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label>Data</Label>
-              <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
-            </div>
-          </div>
-          <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
-            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setExpenseFormOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              className="w-full sm:w-auto flex-1"
-              onClick={handleAddExpense}
-              disabled={!formDesc.trim() || !formValue || !formDate || savingExpense}
-            >
-              <Receipt className="w-4 h-4 mr-2" />
-              {savingExpense ? "Salvando..." : "Lançar Despesa"}
-            </Button>
-          </div>
-        </div>
-      </ResponsiveModal>
+        onOpenChange={setExpenseFormOpen}
+        expenseToEdit={expenseToEdit}
+        onSaved={fetchData}
+      />
 
       {/* ── Dialog: Excluir Despesa ── */}
       <AlertDialog open={!!deleteExpenseData} onOpenChange={(v) => !v && setDeleteExpenseData(null)}>
@@ -467,37 +512,54 @@ export default function DashboardPage() {
         </AlertDialogContent>
       </AlertDialog>
 
+      <OrderDetailsModal
+        open={orderDetailsOpen}
+        onOpenChange={setOrderDetailsOpen}
+        orders={filteredOrders}
+        periodLabel={allPeriod ? "Todo o Período" : `${MONTH_NAMES[viewMonth - 1]} ${viewYear}`}
+      />
+
     </div>
   );
 }
 
-function CostCard({ icon, label, color, value, total }: {
+function CostCard({ icon, label, color, provValue, realValue }: {
   icon: React.ReactNode;
   label: string;
   color: "blue" | "orange" | "purple";
-  value: number;
-  total: number;
+  provValue: number;
+  realValue: number;
 }) {
   const colorMap = {
     blue: { bar: "bg-blue-500", text: "text-blue-500/70" },
     orange: { bar: "bg-orange-500", text: "text-orange-500/70" },
     purple: { bar: "bg-purple-500", text: "text-purple-500/70" },
   };
-  const pct = total > 0 ? Math.min(100, (value / total) * 100) : 0;
+  
+  const rawPct = provValue > 0 ? (realValue / provValue) * 100 : (realValue > 0 ? 100 : 0);
+  const isOver = rawPct > 100;
+  const widthPct = Math.min(100, rawPct);
+  
+  const barClass = isOver ? "bg-red-500" : colorMap[color].bar;
 
   return (
-    <Card className="border-border shadow-sm">
+    <Card className="border-border shadow-sm bg-white/5 backdrop-blur-sm">
       <CardHeader className="pb-2">
         <CardDescription className={`flex items-center gap-2 uppercase tracking-widest text-[10px] font-semibold ${colorMap[color].text}`}>
           {icon} {label}
         </CardDescription>
-        <CardTitle className="text-2xl">{formatBRL(value)}</CardTitle>
+        <CardTitle className="text-2xl">{formatBRL(provValue)}</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="w-full bg-muted rounded-full h-1.5 mt-2">
-          <div className={`${colorMap[color].bar} h-1.5 rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+        <div className="w-full bg-muted/50 rounded-full h-1.5 mt-2 overflow-hidden">
+          <div className={`${barClass} h-1.5 rounded-full transition-all duration-500`} style={{ width: `${widthPct}%` }} />
         </div>
-        <p className="text-xs text-muted-foreground mt-1.5">{pct.toFixed(1)}% dos custos operacionais</p>
+        <p className="text-xs text-muted-foreground mt-1.5 flex justify-between items-center">
+          <span>Gasto Real: <strong>{formatBRL(realValue)}</strong></span>
+          <span className={isOver ? "text-red-500 font-bold" : ""}>
+            {rawPct.toFixed(0)}%
+          </span>
+        </p>
       </CardContent>
     </Card>
   );

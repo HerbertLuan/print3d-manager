@@ -194,11 +194,14 @@ export default function OrdersPage() {
 
   async function handlePaymentToggle(order: Order) {
     const newStatus: PaymentStatus = order.payment_status === "Pago" ? "Pendente" : "Pago";
+    const todayStr = new Date().toLocaleDateString("en-CA");
+    const newPaidAt = newStatus === "Pago" ? todayStr : undefined;
+
     try {
-      await updateOrderPaymentStatus(order.id, newStatus);
+      await updateOrderPaymentStatus(order.id, newStatus, newPaidAt);
       setOrders((prev) =>
         prev.map((o) =>
-          o.id === order.id ? { ...o, payment_status: newStatus } : o
+          o.id === order.id ? { ...o, payment_status: newStatus, paid_at: newPaidAt } : o
         )
       );
     } catch (err) {

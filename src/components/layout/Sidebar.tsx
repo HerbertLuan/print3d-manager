@@ -7,7 +7,6 @@ import {
   Calculator,
   BookOpen,
   ClipboardList,
-  Printer,
   Menu,
   PackageOpen,
   Tag,
@@ -19,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
+import { BrandLogo } from "@/components/branding/BrandLogo";
 
 const navItems = [
   {
@@ -146,15 +146,20 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
 
 function Logo() {
   return (
-    <div className="flex items-center gap-3">
-      <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shrink-0">
-        <Printer className="w-5 h-5 text-primary-foreground" />
-      </div>
-      <div>
-        <h1 className="font-bold text-sm leading-tight text-foreground">
-          Print3D Manager
-        </h1>
-        <p className="text-xs text-muted-foreground">Bambu Lab A1</p>
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <BrandLogo
+          src="/evins-symbol.png"
+          alt="Icone EVINS"
+          className="h-14 w-14 rounded-2xl border-white/12 bg-black/55 p-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.35)]"
+          imageClassName="object-contain"
+        />
+        <div>
+          <h1 className="font-bold text-sm leading-tight text-foreground">
+          EVINS Personalizados
+          </h1>
+          <p className="text-xs text-muted-foreground">Painel de operacoes 3D</p>
+        </div>
       </div>
     </div>
   );

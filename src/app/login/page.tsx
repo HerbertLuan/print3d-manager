@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { Printer, Loader2, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Loader2, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
+import { BrandLogo } from "@/components/branding/BrandLogo";
 
 // ─── Mapeamento de erros Firebase → mensagens amigáveis ──────────────────────
 function getFirebaseErrorMessage(code: string): string {
@@ -60,11 +61,9 @@ export default function LoginPage() {
         <div className="bg-card border border-border rounded-2xl p-8 shadow-2xl">
           {/* Logo */}
           <div className="flex flex-col items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
-              <Printer className="w-6 h-6 text-primary-foreground" />
-            </div>
+            <BrandLogo className="h-24 w-full max-w-[280px]" priority />
             <div className="text-center">
-              <h1 className="text-xl font-bold text-foreground">Print3D Manager</h1>
+              <h1 className="text-xl font-bold text-foreground">EVINS Personalizados</h1>
               <p className="text-sm text-muted-foreground mt-0.5">Painel Administrativo</p>
             </div>
           </div>
@@ -158,7 +157,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground/50 mt-6">
-          Print3D Manager · Acesso exclusivo para administradores
+          EVINS Personalizados · Acesso exclusivo para administradores
         </p>
       </div>
     </div>

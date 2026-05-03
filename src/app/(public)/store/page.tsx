@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useMemo } from "react";
+import Image from "next/image";
 import { getStoreItems, getActiveCollections } from "@/lib/firestore";
 import { CatalogItem, Collection } from "@/lib/types";
 import { Accordion } from "@/components/ui/accordion";
@@ -8,7 +9,6 @@ import { useCartHydrated, useCartStore } from "@/lib/cart-store";
 import { CartSheet, CartFab } from "./components/CartSheet";
 import { ExpandableCategory, CategoryGroup } from "./components/ExpandableCategory";
 import {
-  Printer,
   ChevronRight,
   Wifi,
   Zap,
@@ -25,7 +25,7 @@ import { analytics } from "@/lib/firebase";
 // ─── Configuração (editável) ────────────────────────────────────────────────
 
 const WHATSAPP_NUMBER = "5561985592709";
-const BRAND_NAME = "Print3D Design";
+const BRAND_NAME = "EVINS Personalizados";
 
 const HERO = {
   badge: "✦ Impressão 3D sob medida",
@@ -41,27 +41,27 @@ const PILLARS = [
     title: "Tecnologia NFC",
     description:
       "Nossos chaveiros com chip NFC permitem compartilhar contato, redes sociais ou links com um simples toque.",
-    color: "from-blue-500/20 to-cyan-500/20",
-    iconColor: "text-cyan-400",
-    borderColor: "border-cyan-500/20",
+    color: "from-primary/20 to-secondary/20",
+    iconColor: "text-primary",
+    borderColor: "border-primary/20",
   },
   {
     icon: Zap,
     title: "Fabricação Rápida",
     description:
       "Produção ágil com impressoras Bambu Lab de última geração. Peças prontas em horas, não em dias.",
-    color: "from-orange-500/20 to-amber-500/20",
-    iconColor: "text-orange-400",
-    borderColor: "border-orange-500/20",
+    color: "from-secondary/20 to-primary/10",
+    iconColor: "text-secondary",
+    borderColor: "border-secondary/20",
   },
   {
     icon: ShieldCheck,
     title: "Qualidade Premium",
     description:
       "Materiais certificados PLA e PETG com acabamento profissional. Cada peça é inspecionada antes do envio.",
-    color: "from-emerald-500/20 to-green-500/20",
-    iconColor: "text-emerald-400",
-    borderColor: "border-emerald-500/20",
+    color: "from-yellow-400/14 to-primary/14",
+    iconColor: "text-yellow-300",
+    borderColor: "border-yellow-400/20",
   },
 ];
 
@@ -94,13 +94,6 @@ const FAQ_ITEMS = [
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function buildWhatsappUrl(productName: string): string {
-  const message = encodeURIComponent(
-    `Olá! Gostei do *${productName}* que vi na loja e queria saber mais.`
-  );
-  return `https://wa.me/${WHATSAPP_NUMBER}?text=${message}`;
-}
 
 function buildGenericWhatsappUrl(): string {
   const message = encodeURIComponent(
@@ -137,11 +130,19 @@ function Navbar() {
       <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center shadow-[0_0_20px_rgba(249,115,22,0.35)]">
-            <Printer className="w-4 h-4 text-white" />
+          <div className="evins-glass-panel relative flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl">
+            <div className="evins-logo-halo absolute inset-1 opacity-90" />
+            <Image
+              src="/evins-symbol-raw.png"
+              alt="Ícone EVINS"
+              fill
+              priority
+              sizes="40px"
+              className="relative z-10 object-contain p-1.5"
+            />
           </div>
-          <span className="font-semibold text-sm tracking-wide text-white/90">
-            {BRAND_NAME}
+          <span className="hidden text-sm font-semibold tracking-[0.24em] text-white/82 sm:inline-block">
+            EVINS
           </span>
         </div>
 
@@ -162,12 +163,12 @@ function Navbar() {
           <button
             onClick={handleOpenCart}
             aria-label="Abrir carrinho"
-            className="relative flex items-center gap-2 h-9 px-4 rounded-full border border-white/15 text-white/60 text-sm hover:bg-white/5 hover:text-white hover:border-white/30 transition"
+            className="relative flex items-center gap-2 h-9 px-4 rounded-full border border-white/15 bg-white/[0.02] text-white/60 text-sm hover:bg-white/5 hover:text-white hover:border-primary/40 transition"
           >
             <ShoppingBag className="w-4 h-4" />
             <span className="hidden sm:inline">Carrinho</span>
             {count > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 min-w-[18px] min-h-[18px] rounded-full bg-orange-500 text-white text-[9px] font-extrabold flex items-center justify-center">
+              <span className="absolute -top-1.5 -right-1.5 flex min-h-[18px] min-w-[18px] items-center justify-center rounded-full bg-gradient-to-r from-primary to-secondary text-[9px] font-extrabold text-white shadow-[0_0_12px_rgba(37,99,235,0.35)]">
                 {count > 9 ? "9+" : count}
               </span>
             )}
@@ -187,8 +188,8 @@ function HeroSection({ catalogRef }: { catalogRef: React.RefObject<HTMLElement |
     <section className="relative min-h-[90vh] flex flex-col items-center justify-center pt-16 px-5 sm:px-8 overflow-hidden">
       {/* Ambient glows */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[500px] bg-gradient-to-br from-orange-500/15 via-rose-500/10 to-purple-600/15 blur-[140px] rounded-full" />
-        <div className="absolute bottom-0 left-1/4 w-96 h-96 bg-blue-600/10 blur-[100px] rounded-full" />
+        <div className="absolute top-1/3 left-1/2 h-[500px] w-[700px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-br from-primary/18 via-secondary/12 to-yellow-400/10 blur-[140px]" />
+        <div className="absolute bottom-0 left-1/4 h-96 w-96 rounded-full bg-secondary/14 blur-[100px]" />
       </div>
 
       {/* Grid overlay pattern */}
@@ -202,9 +203,30 @@ function HeroSection({ catalogRef }: { catalogRef: React.RefObject<HTMLElement |
       />
 
       <div className="relative z-10 flex flex-col items-center text-center max-w-4xl mx-auto">
+        <div className="mb-8 flex w-full justify-center sm:mb-10">
+          <div className="relative w-full max-w-[860px] px-2">
+            <div className="evins-logo-halo absolute left-1/2 top-1/2 h-[64%] w-[58%] -translate-x-1/2 -translate-y-1/2 opacity-95" />
+            <div className="absolute left-1/2 top-1/2 h-[74%] w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-[2rem] bg-[radial-gradient(circle,rgba(37,99,235,0.08),transparent_68%)] blur-2xl" />
+            <div className="evins-glass-panel relative overflow-hidden rounded-[2rem] px-6 py-5 sm:px-8 sm:py-6 lg:px-10 lg:py-7">
+              <div className="evins-glass-edge absolute inset-x-8 top-0 h-px opacity-80" />
+              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.06),transparent_36%,transparent_64%,rgba(124,58,237,0.05))]" />
+              <div className="absolute -left-8 top-6 h-24 w-24 rounded-full bg-primary/12 blur-3xl" />
+              <div className="absolute -right-8 bottom-6 h-24 w-24 rounded-full bg-secondary/14 blur-3xl" />
+              <div className="relative z-10 mx-auto flex h-[100px] w-full max-w-[760px] items-center justify-center sm:h-[124px] lg:h-[144px]">
+                <img
+                  src="/evins-wordmark-raw.png"
+                  alt="EVINS Personalizados"
+                  className="evins-wordmark-screen block h-full w-full object-contain"
+                  draggable="false"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Badge */}
-        <div className="inline-flex items-center gap-2 bg-white/[0.06] border border-white/10 rounded-full px-4 py-1.5 text-xs text-white/60 font-medium tracking-widest uppercase mb-8 backdrop-blur-sm">
-          <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
+        <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/40 px-4 py-1.5 text-xs font-medium uppercase tracking-widest text-white/60 backdrop-blur-md">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-yellow-300" />
           {HERO.badge}
         </div>
 
@@ -214,7 +236,7 @@ function HeroSection({ catalogRef }: { catalogRef: React.RefObject<HTMLElement |
             {HERO.headline.split("\n")[0]}
           </span>
           <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-rose-400 to-pink-500">
+          <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-secondary to-yellow-300">
             {HERO.headline.split("\n")[1]}
           </span>
         </h1>
@@ -228,7 +250,7 @@ function HeroSection({ catalogRef }: { catalogRef: React.RefObject<HTMLElement |
         <div className="flex flex-col sm:flex-row items-center gap-4">
           <button
             onClick={scrollToCatalog}
-            className="group h-14 px-8 rounded-full bg-gradient-to-r from-orange-500 to-rose-500 text-white font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all duration-200 shadow-[0_0_30px_rgba(249,115,22,0.3)] flex items-center gap-2"
+            className="evins-gradient-button group flex h-14 items-center gap-2 rounded-full px-8 text-sm font-semibold text-white transition-all duration-200 active:scale-[0.98]"
           >
             {HERO.cta}
             <ArrowDown className="w-4 h-4 transition-transform group-hover:translate-y-1" />
@@ -237,7 +259,7 @@ function HeroSection({ catalogRef }: { catalogRef: React.RefObject<HTMLElement |
             href={buildGenericWhatsappUrl()}
             target="_blank"
             rel="noopener noreferrer"
-            className="h-14 px-8 rounded-full border border-white/15 text-white/70 font-medium text-sm hover:bg-white/5 hover:text-white hover:border-white/30 transition-all duration-200 flex items-center gap-2"
+            className="flex h-14 items-center gap-2 rounded-full border border-white/15 px-8 text-sm font-medium text-white/70 transition-all duration-200 hover:border-secondary/40 hover:bg-white/5 hover:text-white"
           >
             <MessageCircle className="w-4 h-4" />
             Falar pelo WhatsApp
@@ -354,7 +376,7 @@ function StoreCatalog({ catalogRef }: { catalogRef: React.RefObject<HTMLElement 
     <section ref={catalogRef} id="catalogo" className="py-20 px-5 sm:px-8 max-w-7xl mx-auto">
       {/* Cabeçalho da seção */}
       <div className="text-center mb-14">
-        <div className="inline-flex items-center gap-2 text-orange-400 text-xs font-bold uppercase tracking-widest mb-4">
+        <div className="mb-4 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-primary">
           <Sparkles className="w-4 h-4" />
           Vitrine
           <Sparkles className="w-4 h-4" />
@@ -395,7 +417,7 @@ function StoreCatalog({ catalogRef }: { catalogRef: React.RefObject<HTMLElement 
             href={buildGenericWhatsappUrl()}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 mt-6 h-12 px-6 rounded-full bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all text-sm font-medium"
+            className="mt-6 inline-flex h-12 items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 text-sm font-medium text-white/70 transition-all hover:border-primary/35 hover:bg-white/10 hover:text-white"
           >
             <MessageCircle className="w-4 h-4" />
             Fazer encomenda
@@ -406,7 +428,7 @@ function StoreCatalog({ catalogRef }: { catalogRef: React.RefObject<HTMLElement 
       {/* Grupos de coleção */}
       {!loading && !error && groups.length > 0 && (
         <div className="space-y-2">
-          {groups.map((group, idx) => (
+          {groups.map((group) => (
             <ExpandableCategory
               key={group.collection?.id ?? "__general__"}
               group={group}
@@ -440,7 +462,7 @@ function CtaBanner() {
     <section className="py-16 px-5 sm:px-8">
       <div className="relative max-w-4xl mx-auto rounded-3xl overflow-hidden">
         {/* Background */}
-        <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 via-rose-500/15 to-purple-600/20" />
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/18 via-secondary/14 to-yellow-400/12" />
         <div className="absolute inset-0 backdrop-blur-sm border border-white/10 rounded-3xl" />
 
         <div className="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-6 p-10">
@@ -456,7 +478,7 @@ function CtaBanner() {
             href={buildGenericWhatsappUrl()}
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0 h-14 px-8 rounded-full bg-white text-black font-bold text-sm hover:bg-zinc-100 active:scale-[0.98] transition-all flex items-center gap-2 shadow-xl"
+            className="evins-gradient-button flex h-14 shrink-0 items-center gap-2 rounded-full px-8 text-sm font-bold text-white transition-all active:scale-[0.98]"
           >
             <MessageCircle className="w-4 h-4" />
             Chamar no WhatsApp
@@ -470,11 +492,16 @@ function CtaBanner() {
 function Footer() {
   return (
     <footer className="border-t border-white/[0.06] py-12 px-5 text-center">
-      <div className="flex items-center justify-center gap-2 mb-3">
-        <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-orange-400 to-rose-500 flex items-center justify-center">
-          <Printer className="w-3 h-3 text-white" />
+      <div className="mb-4 flex justify-center">
+        <div className="relative h-16 w-52">
+          <Image
+            src="/evins-wordmark-raw.png"
+            alt="EVINS Personalizados"
+            fill
+            sizes="208px"
+            className="evins-wordmark-screen object-contain"
+          />
         </div>
-        <span className="text-sm font-medium text-white/50">{BRAND_NAME}</span>
       </div>
       <p className="text-xs text-white/20">
         © {new Date().getFullYear()} {BRAND_NAME}. Todos os direitos reservados.

@@ -21,7 +21,7 @@ import {
   StoreOrder,
   InventoryItem, NewInventoryItem,
   Supply, NewSupply,
-  Expense, NewExpense,
+  Expense, NewExpense, ExpenseCategory, NewExpenseCategory,
   Filament, NewFilament,
   Collection, NewCollection,
 } from "./types";
@@ -204,6 +204,47 @@ export async function deleteExpense(id: string): Promise<void> {
   await deleteDoc(doc(db, "expenses", id));
 }
 
+export async function updateExpense(
+  id: string,
+  data: Partial<Omit<Expense, "id" | "created_at">>
+): Promise<void> {
+  await updateDoc(doc(db, "expenses", id), data);
+}
+
+// =====================================================
+// EXPENSE CATEGORY OPERATIONS
+// =====================================================
+
+export async function getExpenseCategories(): Promise<ExpenseCategory[]> {
+  const q = query(collection(db, "expense_categories"), orderBy("name", "asc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...doc.data(),
+  })) as ExpenseCategory[];
+}
+
+export async function addExpenseCategory(
+  category: Omit<NewExpenseCategory, "created_at">
+): Promise<string> {
+  const docRef = await addDoc(collection(db, "expense_categories"), {
+    ...category,
+    created_at: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+export async function updateExpenseCategory(
+  id: string,
+  data: Partial<Omit<ExpenseCategory, "id" | "created_at">>
+): Promise<void> {
+  await updateDoc(doc(db, "expense_categories", id), data);
+}
+
+export async function deleteExpenseCategory(id: string): Promise<void> {
+  await deleteDoc(doc(db, "expense_categories", id));
+}
+
 // =====================================================
 // ORDER OPERATIONS
 // =====================================================
@@ -267,11 +308,18 @@ export async function updateOrder(
 
 export async function updateOrderPaymentStatus(
   orderId: string,
-  status: string
+  status: string,
+  paidAt?: string
 ): Promise<void> {
-  await updateDoc(doc(db, "orders", orderId), {
-    payment_status: status,
-  });
+  const updateData: any = { payment_status: status };
+  if (status === "Pago") {
+    // Usa a data fornecida ou a data local atual (YYYY-MM-DD)
+    const todayStr = new Date().toLocaleDateString("en-CA"); // formato YYYY-MM-DD
+    updateData.paid_at = paidAt || todayStr;
+  } else {
+    updateData.paid_at = null; // remove a data de pagamento
+  }
+  await updateDoc(doc(db, "orders", orderId), updateData);
 }
 
 export async function updateOrderInventoryAssignment(

@@ -1,0 +1,834 @@
+[browser] [2026-04-29T18:01:51.121Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:01:51.123Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] [2026-04-29T18:01:52.338Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:02:03.671Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:02:03.671Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] Collections not loaded: FirebaseError: Missing or insufficient permissions.
+FirebaseError: Missing or insufficient permissions. (src/app/(public)
+[browser] [2026-04-29T18:03:39.448Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:03:48.512Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] [2026-04-29T18:04:34.259Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:04:34.260Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] Collections not loaded: FirebaseError: Missing or insufficient permissions.
+FirebaseError: Missing or insufficient permissions. (src/app/(public)
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] [2026-04-29T18:04:51.450Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:04:51.451Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:04:51.451Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:05:03.707Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] [2026-04-29T18:05:39.883Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:05:39.884Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] [2026-04-29T18:05:50.929Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] [2026-04-29T18:06:03.633Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:06:03.633Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] [2026-04-29T18:06:13.808Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:06:13.808Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] [2026-04-29T18:06:14.921Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:06:14.921Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] [2026-04-29T18:06:22.703Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:06:22.703Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] [2026-04-29T18:07:25.928Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:07:25.928Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] [2026-04-29T18:11:35.465Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:11:40.722Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:11:40.723Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] [2026-04-29T18:22:12.457Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:22:12.458Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] [2026-04-29T18:23:40.961Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] In HTML, <html> cannot be a child of <main>.
+This will cause a hydration error.
+
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head>
+                  <__next_root_layout_boundary__>
+                    <SegmentViewNode type="layout" pagePath="layout.tsx">
+                      <SegmentTrieNode>
+                      <link>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <script>
+                      <RootLayout>
+                        <html lang="pt-BR" className="dark">
+                          <body className="min-h-scre...">
+                            <AuthProvider>
+                              <AnalyticsTracker>
+                              <div className="flex flex-...">
+                                <Sidebar>
+>                               <main className="flex-1 flex flex-col min-h-screen overflow-auto">
+                                  ...
+                                    <SegmentViewNode type="layout" pagePath="(public)/l...">
+                                      <SegmentTrieNode>
+                                      <script>
+                                      <PublicLayout>
+>                                       <html lang="pt-BR" className="dark scroll-smooth">
+                            ...
+                  ...
+ 
+[browser] <main> cannot contain a nested <html>.
+See this log for the ancestor stack trace. 
+[browser] You are mounting a new html component when a previous one has not first unmounted. It is an error to render more than one html component at a time and attributes and children of these components will likely fail in unpredictable ways. Please only render a single instance of <html> and if you need to mount a new one, ensure any previous ones have unmounted first. 
+[browser] You are mounting a new body component when a previous one has not first unmounted. It is an error to render more than one body component at a time and attributes and children of these components will likely fail in unpredictable ways. Please only render a single instance of <body> and if you need to mount a new one, ensure any previous ones have unmounted first. 
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                                ...
+                                  <nav className="fixed top-...">
+                                    <div className="max-w-7xl ...">
+                                      <div className="flex items...">
+                                        <div
++                                         className="evins-glass-panel relative flex h-10 w-10 items-center justify-ce..."
+-                                         className="relative overflow-hidden border border-white/10 bg-black/60 shado..."
+                                        >
++                                         <div className="evins-logo-halo absolute inset-1 opacity-90">
+-                                         <img
+-                                           alt="EVINS Personalizados"
+-                                           decoding="async"
+-                                           data-nimg="fill"
+-                                           className="object-contain"
+-                                           style={{position:"absolute",height:"100%",width:"100%",left:"0px",top:"0px",right:"0px",bottom:"0px", ...}}
+-                                           src="/evins-logo-full.png"
+-                                         >
+                                          ...
+                                        ...
+                                      ...
+                                ...
+                      ...
+          ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at div (<anonymous>)
+    at Navbar (src/app/(public)/store/page.tsx:134:13)
+    at StorePage (src/app/(public)/store/page.tsx:522:7)
+  132 |         <div className="flex items-center gap-2.5">
+  133 |           <div className="evins-glass-panel relative flex h-10 w-10 items-center justify-...
+> 134 |             <div className="evins-logo-halo absolute inset-1 opacity-90" />
+      |             ^
+  135 |             <Image
+  136 |               src="/evins-symbol-raw.png"
+  137 |               alt="Ícone EVINS"
+[browser] [2026-04-29T18:24:24.792Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:24:24.792Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:24:24.792Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] You are mounting a new html component when a previous one has not first unmounted. It is an error to render more than one html component at a time and attributes and children of these components will likely fail in unpredictable ways. Please only render a single instance of <html> and if you need to mount a new one, ensure any previous ones have unmounted first. 
+[browser] You are mounting a new body component when a previous one has not first unmounted. It is an error to render more than one body component at a time and attributes and children of these components will likely fail in unpredictable ways. Please only render a single instance of <body> and if you need to mount a new one, ensure any previous ones have unmounted first. 
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] Image with src "http://localhost:3000/evins-wordmark-raw.png" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height.
+[browser] [2026-04-29T18:25:02.497Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:25:02.497Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] Image with src "http://localhost:3000/evins-wordmark-raw.png" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height.
+[browser] [2026-04-29T18:25:45.470Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:25:45.470Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] Image with src "http://localhost:3000/evins-wordmark-raw.png" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height.
+[browser] [2026-04-29T18:25:46.646Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:25:46.646Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] [2026-04-29T18:26:51.388Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] Image with src "http://localhost:3000/evins-wordmark-raw.png" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height.
+[browser] [2026-04-29T18:27:05.643Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:27:05.643Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] Image with src "http://localhost:3000/evins-wordmark-raw.png" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height.
+[browser] [2026-04-29T18:27:19.081Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:27:19.081Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] [2026-04-29T18:27:20.101Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:27:20.101Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] Image with src "http://localhost:3000/evins-wordmark-raw.png" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height.
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] Image with src "http://localhost:3000/evins-wordmark-raw.png" has "fill" and a height value of 0. This is likely because the parent element of the image has not been styled to have a set height.
+[browser] [2026-04-29T18:27:26.398Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:27:26.400Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] Collections not loaded: FirebaseError: Missing or insufficient permissions.
+FirebaseError: Missing or insufficient permissions. (src/app/(public)
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).
+[browser] Image with src "/evins-wordmark-raw.png" was detected as the Largest Contentful Paint (LCP). Please add the `loading="eager"` property if this image is above the fold.
+Read more: https://nextjs.org/docs/app/api-reference/components/image#loading
+[browser] [2026-04-29T18:28:25.197Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T18:28:25.378Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <RenderFromTemplateContext>
+      <ScrollAndMaybeFocusHandler cacheNode={{rsc:{...}, ...}}>
+        <InnerScrollAndFocusHandlerOld focusAndScrollRef={{scrollRef:null, ...}} cacheNode={{rsc:{...}, ...}}>
+          <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+            <LoadingBoundary name="/" loading={null}>
+              <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+                <HTTPAccessFallbackErrorBoundary pathname="/store/" notFound={{...}} forbidden={undefined} ...>
+                  <RedirectBoundary>
+                    <RedirectErrorBoundary router={{...}}>
+                      <InnerLayoutRouter url="/store/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} ...>
+                        <SegmentViewNode type="layout" pagePath="(public)/l...">
+                          <SegmentTrieNode>
+                          <script>
+                          <PublicLayout>
+                            <html
+                              lang="pt-BR"
++                             className="dark scroll-smooth"
+-                             className="dark"
+                            >
+                              <body
++                               className="min-h-screen overflow-x-hidden bg-[#050507] text-slate-50 antialiased"
+-                               className="min-h-screen bg-background text-foreground antialiased"
+                              >
+                      ...
+          ...
+ 
+[browser] [2026-04-29T22:13:07.691Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] [2026-04-29T22:13:07.692Z]  @firebase/analytics: FirebaseError: Analytics: Dynamic config fetch failed: [400] Request contains an invalid argument. (analytics/config-fetch-failed).
+[browser] FirebaseError: Installations: Create Installation request failed with error "400 INVALID_ARGUMENT: Request contains an invalid argument." (installations/request-failed).

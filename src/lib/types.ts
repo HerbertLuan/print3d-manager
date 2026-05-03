@@ -131,11 +131,24 @@ export interface Expense {
   id: string;
   description: string;
   value: number;
-  date: string; // ISO string "YYYY-MM-DD"
+  date: string; // ISO string "YYYY-MM-DD" (Data de Competência)
+  categoria?: string;
+  tipo_cobranca?: "Única" | "Fixa Mensal" | "Parcelada";
+  parcelas?: string; // ex: "1/3"
+  status?: "Pendente" | "Pago";
+  paid_at?: string; // YYYY-MM-DD (Data de Pagamento para fluxo de caixa)
   created_at: Timestamp;
 }
 
 export type NewExpense = Omit<Expense, "id">;
+
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  created_at: Timestamp;
+}
+
+export type NewExpenseCategory = Omit<ExpenseCategory, "id">;
 
 // =====================================================
 // ORDER TYPES
@@ -200,6 +213,7 @@ export interface Order {
   /** Código curto gerado no site para facilitar identificação (ex: A7F2) */
   shortCode?: string;
   payment_status: PaymentStatus;
+  paid_at?: string; // Data de Pagamento para fluxo de caixa (YYYY-MM-DD)
   production_status: ProductionStatus;
   created_at: Timestamp;
 }

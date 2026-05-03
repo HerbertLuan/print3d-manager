@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { useCartStore, useCartHydrated } from "@/lib/cart-store";
 import { createStoreOrder } from "@/lib/firestore";
@@ -138,18 +138,18 @@ export function CartSheet() {
 
       {/* Sheet */}
       <aside
-        className="fixed top-0 right-0 z-50 h-full w-full sm:w-[420px] bg-[#0a0a0f] border-l border-white/10 flex flex-col shadow-2xl"
+        className="fixed top-0 right-0 z-50 flex h-full w-full flex-col border-l border-white/10 bg-[#0a0a0f] shadow-2xl sm:w-[420px]"
         aria-label="Carrinho de compras"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.07]">
           <div className="flex items-center gap-2.5">
-            <ShoppingBag className="w-5 h-5 text-orange-400" />
+            <ShoppingBag className="h-5 w-5 text-primary" />
             <h2 className="font-semibold text-white text-base">
               Meu Carrinho
             </h2>
             {itemCount > 0 && (
-              <span className="bg-orange-500 text-white text-[10px] font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-r from-primary to-secondary text-[10px] font-bold text-white shadow-[0_0_12px_rgba(37,99,235,0.3)]">
                 {itemCount}
               </span>
             )}
@@ -195,7 +195,7 @@ export function CartSheet() {
             <p className="text-white/40 text-sm">Seu carrinho está vazio.</p>
             <button
               onClick={closeCart}
-              className="text-orange-400 text-sm hover:underline"
+              className="text-primary text-sm hover:underline"
             >
               Continuar comprando
             </button>
@@ -298,7 +298,7 @@ export function CartSheet() {
               <button
                 type="submit"
                 disabled={loading || items.length === 0}
-                className="w-full h-12 rounded-full bg-gradient-to-r from-orange-500 to-rose-500 text-white font-bold text-sm hover:opacity-90 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                className="evins-gradient-button flex h-12 w-full items-center justify-center gap-2 rounded-full text-sm font-bold text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? (
                   <>
@@ -316,6 +316,11 @@ export function CartSheet() {
                 Seu pedido será registrado e você será redirecionado para o
                 WhatsApp para confirmar.
               </p>
+              {error && (
+                <p className="text-center text-xs text-red-400" role="alert">
+                  {error}
+                </p>
+              )}
             </div>
           </form>
         )}
@@ -336,11 +341,11 @@ export function CartFab() {
     <button
       onClick={openCart}
       aria-label="Abrir carrinho"
-      className="fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-gradient-to-r from-orange-500 to-rose-500 text-white flex items-center justify-center shadow-[0_0_30px_rgba(249,115,22,0.4)] hover:scale-105 active:scale-95 transition-all duration-200"
+      className="evins-gradient-button fixed bottom-6 right-6 z-30 flex h-14 w-14 items-center justify-center rounded-full text-white transition-all duration-200 hover:scale-105 active:scale-95"
     >
       <ShoppingBag className="w-6 h-6" />
       {count > 0 && (
-        <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-white text-orange-600 text-[10px] font-extrabold flex items-center justify-center shadow">
+        <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-primary text-[10px] font-extrabold shadow">
           {count > 9 ? "9+" : count}
         </span>
       )}
