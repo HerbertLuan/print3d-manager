@@ -496,11 +496,11 @@ function Footer() {
       <div className="mb-4 flex justify-center">
         <div className="relative h-16 w-52">
           <Image
-            src="/evins-wordmark-raw.png"
+            src="/evins-wordmark-transparent.png"
             alt="EVINS Personalizados"
             fill
             sizes="208px"
-            className="evins-wordmark-screen object-contain"
+            className="object-contain"
           />
         </div>
       </div>
