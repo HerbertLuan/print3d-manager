@@ -215,12 +215,11 @@ function HeroSection({ catalogRef }: { catalogRef: React.RefObject<HTMLElement |
             <span aria-hidden="true" className="evins-sparkle pointer-events-none absolute z-20 rounded-full bg-[#2563EB]" style={{width:4,height:4,bottom:'-8%',right:'14%',animationDelay:'1.9s'}} />
             <span aria-hidden="true" className="evins-sparkle pointer-events-none absolute z-20 rounded-full bg-[#7C3AED]" style={{width:3,height:3,top:'30%',left:'-4%',animationDelay:'3.1s'}} />
 
-            {/* A logo em si — mix-blend-mode:screen torna o fundo preto invisível */}
+            {/* A logo em si — PNG com alpha transparente, sem mix-blend-mode */}
             <img
               src="/evins-logo-hero.png"
               alt="EVINS Personalizados"
               className="evins-hero-logo relative z-10 w-[270px] sm:w-[390px] lg:w-[490px] xl:w-[550px]"
-              style={{ mixBlendMode: "screen" }}
               draggable="false"
             />
           </div>
