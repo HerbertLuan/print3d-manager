@@ -203,39 +203,26 @@ function HeroSection({ catalogRef }: { catalogRef: React.RefObject<HTMLElement |
       />
 
       <div className="relative z-10 flex flex-col items-center text-center max-w-4xl mx-auto">
-        <div className="mb-8 flex w-full justify-center sm:mb-10">
-          <div className="relative w-full max-w-[860px] px-2">
-            <div className="evins-logo-halo absolute left-1/2 top-1/2 h-[64%] w-[58%] -translate-x-1/2 -translate-y-1/2 opacity-95" />
-            <div className="absolute left-1/2 top-1/2 h-[74%] w-[72%] -translate-x-1/2 -translate-y-1/2 rounded-[2rem] bg-[radial-gradient(circle,rgba(37,99,235,0.08),transparent_68%)] blur-2xl" />
-            <div className="evins-glass-panel relative overflow-hidden rounded-[2rem] px-6 py-5 sm:px-8 sm:py-6 lg:px-10 lg:py-7">
-              <div className="evins-glass-edge absolute inset-x-8 top-0 h-px opacity-80" />
-              <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.06),transparent_36%,transparent_64%,rgba(124,58,237,0.05))]" />
-              <div className="absolute -left-8 top-6 h-24 w-24 rounded-full bg-primary/12 blur-3xl" />
-              <div className="absolute -right-8 bottom-6 h-24 w-24 rounded-full bg-secondary/14 blur-3xl" />
+        <div className="mb-6 flex w-full justify-center sm:mb-8">
+          {/* Logo flutuando livremente — sem caixa, sem borda */}
+          <div className="relative flex items-center justify-center">
 
-              <div className="relative z-10 mx-auto flex h-[120px] w-full max-w-[760px] items-center justify-center sm:h-[148px] lg:h-[172px]">
-                {/* Wrapper de flutuação e perspectiva 3D */}
-                <div className="evins-logo-float-wrap h-full w-full">
-                  {/* Anel de energia interno (sentido horário) */}
-                  <div className="evins-energy-ring" aria-hidden="true" />
-                  {/* Anel de energia externo (contra-horário) */}
-                  <div className="evins-energy-ring-outer" aria-hidden="true" />
-                  {/* Partículas pulsando nos 4 eixos cardinais */}
-                  <div className="evins-energy-dot" aria-hidden="true" />
-                  <div className="evins-energy-dot" aria-hidden="true" />
-                  <div className="evins-energy-dot" aria-hidden="true" />
-                  <div className="evins-energy-dot" aria-hidden="true" />
-                  {/* Logo animada */}
-                  <img
-                    src="/evins-logo-hero.png"
-                    alt="EVINS Personalizados"
-                    className="evins-logo-animated block h-full w-full object-contain"
-                    style={{ mixBlendMode: "screen" }}
-                    draggable="false"
-                  />
-                </div>
-              </div>
-            </div>
+            {/* Sparkles orgânicos */}
+            <span aria-hidden="true" className="evins-sparkle pointer-events-none absolute z-20 rounded-full bg-[#2563EB]" style={{width:5,height:5,top:'-14%',left:'8%',animationDelay:'0s'}} />
+            <span aria-hidden="true" className="evins-sparkle pointer-events-none absolute z-20 rounded-full bg-[#7C3AED]" style={{width:4,height:4,top:'5%',right:'6%',animationDelay:'1.1s'}} />
+            <span aria-hidden="true" className="evins-sparkle pointer-events-none absolute z-20 rounded-full bg-[#8B5CF6]" style={{width:3,height:3,bottom:'-10%',left:'18%',animationDelay:'2.4s'}} />
+            <span aria-hidden="true" className="evins-sparkle pointer-events-none absolute z-20 rounded-full bg-white/70" style={{width:3,height:3,top:'-8%',left:'48%',animationDelay:'0.7s'}} />
+            <span aria-hidden="true" className="evins-sparkle pointer-events-none absolute z-20 rounded-full bg-[#2563EB]" style={{width:4,height:4,bottom:'-8%',right:'14%',animationDelay:'1.9s'}} />
+            <span aria-hidden="true" className="evins-sparkle pointer-events-none absolute z-20 rounded-full bg-[#7C3AED]" style={{width:3,height:3,top:'30%',left:'-4%',animationDelay:'3.1s'}} />
+
+            {/* A logo em si — mix-blend-mode:screen torna o fundo preto invisível */}
+            <img
+              src="/evins-logo-hero.png"
+              alt="EVINS Personalizados"
+              className="evins-hero-logo relative z-10 w-[270px] sm:w-[390px] lg:w-[490px] xl:w-[550px]"
+              style={{ mixBlendMode: "screen" }}
+              draggable="false"
+            />
           </div>
         </div>
 

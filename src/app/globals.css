@@ -234,7 +234,23 @@
     --tw-ring-color: rgb(250 204 21 / 0.95);
   }
 
-  /* ─── Hero Logo — Animação Premium ─────────────────────────────────────────── */
+  /* ─── Hero Logo v2 — Livre, sem caixa ─────────────────────────── */
+
+  /* A logo flutua e respira — drop-shadow segue a silhueta exata,
+     não cria retângulo porque usa o canal alpha da imagem.         */
+  .evins-hero-logo {
+    animation:
+      evins-hero-float 7s ease-in-out infinite,
+      evins-hero-glow  5s ease-in-out infinite;
+    will-change: transform, filter;
+    transform-origin: center;
+  }
+
+  /* Partícula brilhante — ponto de luz que surge e desaparece */
+  .evins-sparkle {
+    animation: evins-sparkle-twinkle 4s ease-in-out infinite;
+    box-shadow: 0 0 6px 1px currentColor;
+  }
 
   .evins-logo-animated {
     animation:
@@ -315,6 +331,44 @@
 }
 
 /* ─── Keyframes ─────────────────────────────────────────────────────────────── */
+
+/* Hero Logo: flutuação suave com leve respiração de escala */
+@keyframes evins-hero-float {
+  0%, 100% { transform: translateY(0px)   scale(1);    }
+  28%       { transform: translateY(-13px) scale(1.013); }
+  55%       { transform: translateY(-20px) scale(1.020); }
+  78%       { transform: translateY(-9px)  scale(1.008); }
+}
+
+/* Hero Logo: glow via drop-shadow — segue a silhueta da imagem */
+@keyframes evins-hero-glow {
+  0%, 100% {
+    filter:
+      drop-shadow(0 0 14px rgba(37, 99, 235, 0.55))
+      drop-shadow(0 0 32px rgba(37, 99, 235, 0.22))
+      drop-shadow(0 0 50px rgba(124, 58, 237, 0.12));
+  }
+  38% {
+    filter:
+      drop-shadow(0 0 28px rgba(37, 99, 235, 0.92))
+      drop-shadow(0 0 65px rgba(37, 99, 235, 0.44))
+      drop-shadow(0 0 100px rgba(124, 58, 237, 0.28));
+  }
+  72% {
+    filter:
+      drop-shadow(0 0 20px rgba(124, 58, 237, 0.82))
+      drop-shadow(0 0 52px rgba(124, 58, 237, 0.38))
+      drop-shadow(0 0 85px rgba(37, 99, 235, 0.20));
+  }
+}
+
+/* Sparkle: surge, brilha e some — ciclo orgânico */
+@keyframes evins-sparkle-twinkle {
+  0%        { opacity: 0;   transform: scale(0) rotate(0deg);   }
+  18%, 22%  { opacity: 1;   transform: scale(1.3) rotate(12deg); }
+  50%       { opacity: 0.3; transform: scale(0.9) rotate(-8deg); }
+  80%, 100% { opacity: 0;   transform: scale(0) rotate(5deg);   }
+}
 
 @keyframes evins-float {
   0%, 100% {
