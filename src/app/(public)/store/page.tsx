@@ -212,13 +212,28 @@ function HeroSection({ catalogRef }: { catalogRef: React.RefObject<HTMLElement |
               <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.06),transparent_36%,transparent_64%,rgba(124,58,237,0.05))]" />
               <div className="absolute -left-8 top-6 h-24 w-24 rounded-full bg-primary/12 blur-3xl" />
               <div className="absolute -right-8 bottom-6 h-24 w-24 rounded-full bg-secondary/14 blur-3xl" />
-              <div className="relative z-10 mx-auto flex h-[100px] w-full max-w-[760px] items-center justify-center sm:h-[124px] lg:h-[144px]">
-                <img
-                  src="/evins-wordmark-raw.png"
-                  alt="EVINS Personalizados"
-                  className="evins-wordmark-screen block h-full w-full object-contain"
-                  draggable="false"
-                />
+
+              <div className="relative z-10 mx-auto flex h-[120px] w-full max-w-[760px] items-center justify-center sm:h-[148px] lg:h-[172px]">
+                {/* Wrapper de flutuação e perspectiva 3D */}
+                <div className="evins-logo-float-wrap h-full w-full">
+                  {/* Anel de energia interno (sentido horário) */}
+                  <div className="evins-energy-ring" aria-hidden="true" />
+                  {/* Anel de energia externo (contra-horário) */}
+                  <div className="evins-energy-ring-outer" aria-hidden="true" />
+                  {/* Partículas pulsando nos 4 eixos cardinais */}
+                  <div className="evins-energy-dot" aria-hidden="true" />
+                  <div className="evins-energy-dot" aria-hidden="true" />
+                  <div className="evins-energy-dot" aria-hidden="true" />
+                  <div className="evins-energy-dot" aria-hidden="true" />
+                  {/* Logo animada */}
+                  <img
+                    src="/evins-logo-hero.png"
+                    alt="EVINS Personalizados"
+                    className="evins-logo-animated block h-full w-full object-contain"
+                    style={{ mixBlendMode: "screen" }}
+                    draggable="false"
+                  />
+                </div>
               </div>
             </div>
           </div>

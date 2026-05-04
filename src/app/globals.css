@@ -233,6 +233,171 @@
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
     --tw-ring-color: rgb(250 204 21 / 0.95);
   }
+
+  /* ─── Hero Logo — Animação Premium ─────────────────────────────────────────── */
+
+  .evins-logo-animated {
+    animation:
+      evins-float 7s ease-in-out infinite,
+      evins-glow-pulse 4s ease-in-out infinite;
+    will-change: transform, filter;
+    transform-style: preserve-3d;
+  }
+
+  .evins-logo-float-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* perspective container para o efeito 3D */
+    perspective: 1000px;
+  }
+
+  /* Anel de energia girando ao redor da logo */
+  .evins-energy-ring {
+    position: absolute;
+    inset: -18%;
+    border-radius: 50%;
+    border: 1.5px solid transparent;
+    background:
+      linear-gradient(#0D0D0D, #0D0D0D) padding-box,
+      conic-gradient(
+        from 0deg,
+        rgba(37, 99, 235, 0) 0%,
+        rgba(37, 99, 235, 0.7) 20%,
+        rgba(124, 58, 237, 0.9) 40%,
+        rgba(139, 92, 246, 0.6) 50%,
+        rgba(124, 58, 237, 0.9) 60%,
+        rgba(37, 99, 235, 0.7) 80%,
+        rgba(37, 99, 235, 0) 100%
+      ) border-box;
+    animation: evins-ring-spin 10s linear infinite;
+    pointer-events: none;
+    filter: blur(0.5px);
+  }
+
+  /* Segundo anel — counter-rotate mais lento */
+  .evins-energy-ring-outer {
+    position: absolute;
+    inset: -28%;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    background:
+      linear-gradient(#0D0D0D, #0D0D0D) padding-box,
+      conic-gradient(
+        from 180deg,
+        rgba(124, 58, 237, 0) 0%,
+        rgba(124, 58, 237, 0.4) 25%,
+        rgba(37, 99, 235, 0.3) 50%,
+        rgba(124, 58, 237, 0.4) 75%,
+        rgba(124, 58, 237, 0) 100%
+      ) border-box;
+    animation: evins-ring-spin-reverse 16s linear infinite;
+    pointer-events: none;
+    filter: blur(0.5px);
+    opacity: 0.6;
+  }
+
+  /* Partículas de energia — pontos pulsando nos cantos */
+  .evins-energy-dot {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(37, 99, 235, 1), rgba(124, 58, 237, 0.6));
+    animation: evins-dot-pulse 3s ease-in-out infinite;
+    pointer-events: none;
+  }
+  .evins-energy-dot:nth-child(1) { top: 8%; left: 50%; animation-delay: 0s; }
+  .evins-energy-dot:nth-child(2) { bottom: 8%; left: 50%; animation-delay: 1s; }
+  .evins-energy-dot:nth-child(3) { top: 50%; left: 6%; animation-delay: 0.5s; }
+  .evins-energy-dot:nth-child(4) { top: 50%; right: 6%; animation-delay: 1.5s; }
+}
+
+/* ─── Keyframes ─────────────────────────────────────────────────────────────── */
+
+@keyframes evins-float {
+  0%, 100% {
+    transform:
+      translateY(0px)
+      perspective(900px)
+      rotateX(0deg)
+      rotateY(0deg);
+  }
+  20% {
+    transform:
+      translateY(-11px)
+      perspective(900px)
+      rotateX(1.6deg)
+      rotateY(0.9deg);
+  }
+  45% {
+    transform:
+      translateY(-18px)
+      perspective(900px)
+      rotateX(0.4deg)
+      rotateY(-1.1deg);
+  }
+  70% {
+    transform:
+      translateY(-8px)
+      perspective(900px)
+      rotateX(-1.3deg)
+      rotateY(0.5deg);
+  }
+  85% {
+    transform:
+      translateY(-4px)
+      perspective(900px)
+      rotateX(0.6deg)
+      rotateY(-0.3deg);
+  }
+}
+
+@keyframes evins-glow-pulse {
+  0%, 100% {
+    filter:
+      drop-shadow(0 0 10px rgba(37, 99, 235, 0.45))
+      drop-shadow(0 0 22px rgba(124, 58, 237, 0.28))
+      drop-shadow(0 0 3px rgba(255, 255, 255, 0.08));
+  }
+  30% {
+    filter:
+      drop-shadow(0 0 22px rgba(37, 99, 235, 0.95))
+      drop-shadow(0 0 46px rgba(124, 58, 237, 0.60))
+      drop-shadow(0 0 80px rgba(37, 99, 235, 0.30))
+      drop-shadow(0 0 6px rgba(255, 255, 255, 0.15));
+  }
+  65% {
+    filter:
+      drop-shadow(0 0 16px rgba(124, 58, 237, 0.80))
+      drop-shadow(0 0 38px rgba(37, 99, 235, 0.50))
+      drop-shadow(0 0 64px rgba(124, 58, 237, 0.22))
+      drop-shadow(0 0 4px rgba(255, 255, 255, 0.1));
+  }
+}
+
+@keyframes evins-ring-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes evins-ring-spin-reverse {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(-360deg); }
+}
+
+@keyframes evins-dot-pulse {
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.7;
+    box-shadow: 0 0 6px rgba(37, 99, 235, 0.8);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.8);
+    opacity: 0.2;
+    box-shadow: 0 0 14px rgba(37, 99, 235, 1), 0 0 28px rgba(124, 58, 237, 0.6);
+  }
 }
 
 ::-webkit-scrollbar {
