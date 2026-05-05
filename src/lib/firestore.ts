@@ -5,6 +5,8 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  getDoc,
+  setDoc,
   serverTimestamp,
   query,
   orderBy,
@@ -24,6 +26,8 @@ import {
   Expense, NewExpense, ExpenseCategory, NewExpenseCategory,
   Filament, NewFilament,
   Collection, NewCollection,
+  Coupon, NewCoupon,
+  StoreSettings,
 } from "./types";
 
 // =====================================================
@@ -490,3 +494,72 @@ export async function deleteCollection(id: string): Promise<void> {
   await deleteDoc(doc(db, "collections", id));
 }
 
+// =====================================================
+// COUPON OPERATIONS
+// =====================================================
+
+
+export async function getCoupons(): Promise<Coupon[]> {
+  const q = query(collection(db, "coupons"), orderBy("created_at", "desc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Coupon[];
+}
+
+/**
+ * Busca um cupom pelo código (case-insensitive no input, armazenado em uppercase).
+ * Retorna null se não encontrado.
+ */
+export async function getCouponByCode(code: string): Promise<Coupon | null> {
+  const q = query(
+    collection(db, "coupons"),
+    where("code", "==", code.toUpperCase().trim()),
+    where("active", "==", true),
+    limit(1)
+  );
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  const d = snapshot.docs[0];
+  return { id: d.id, ...d.data() } as Coupon;
+}
+
+export async function addCoupon(
+  coupon: Omit<NewCoupon, "created_at">
+): Promise<string> {
+  const docRef = await addDoc(collection(db, "coupons"), {
+    ...coupon,
+    code: coupon.code.toUpperCase().trim(),
+    created_at: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+export async function updateCoupon(
+  id: string,
+  data: Partial<Omit<Coupon, "id" | "created_at">>
+): Promise<void> {
+  await updateDoc(doc(db, "coupons", id), data);
+}
+
+export async function deleteCoupon(id: string): Promise<void> {
+  await deleteDoc(doc(db, "coupons", id));
+}
+
+// =====================================================
+// STORE SETTINGS OPERATIONS
+// Documento único: settings/promotions
+// =====================================================
+
+const SETTINGS_DOC = doc(db, "settings", "promotions");
+
+export async function getStoreSettings(): Promise<StoreSettings> {
+  const snap = await getDoc(SETTINGS_DOC);
+  if (snap.exists()) return snap.data() as StoreSettings;
+  // Valor padrão se o documento ainda não existir
+  return { gift_threshold: 150 };
+}
+
+export async function updateStoreSettings(
+  data: Partial<StoreSettings>
+): Promise<void> {
+  await setDoc(SETTINGS_DOC, data, { merge: true });
+}

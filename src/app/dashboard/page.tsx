@@ -22,6 +22,7 @@ import {
   Trash2,
   FileText,
   ListOrdered,
+  Ticket,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -106,6 +107,7 @@ export default function DashboardPage() {
 
   const stats = useMemo(() => {
     let revenue = 0;
+    let totalDiscounts = 0;
     let provFilamento = 0;
     let provMaquina = 0;
     let provInsumo = 0;
@@ -125,7 +127,11 @@ export default function DashboardPage() {
       const inPeriod = allPeriod || mStr === currentMonthStr;
       if (!inPeriod) return;
 
+      // Receita líquida: o campo price já é o total final (com desconto subtraído pelo checkout)
+      // discount_amount fica registrado separadamente para rastreamento
+      const discount = Number(o.discount_amount) || 0;
       revenue += Number(o.price) || 0;
+      totalDiscounts += discount;
       provFilamento += Number(o.filament_cost) || 0;
       provMaquina += Number(o.machine_cost) || 0;
       provInsumo += Number(o.supplies_cost) || 0;
@@ -171,6 +177,7 @@ export default function DashboardPage() {
 
     return { 
       revenue, 
+      totalDiscounts,
       orderCount,
       provFilamento,
       provMaquina,
@@ -379,6 +386,26 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Card de Descontos Concedidos (visível apenas se houver descontos) */}
+        {stats.totalDiscounts > 0 && (
+          <Card className="border-[#7C3AED]/20 bg-[#7C3AED]/5">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-[#a78bfa]">Descontos Concedidos</p>
+                <div className="p-2 bg-[#7C3AED]/15 rounded-md">
+                  <Ticket className="w-4 h-4 text-[#a78bfa]" />
+                </div>
+              </div>
+              <h2 className="text-3xl font-bold text-[#c4b5fd]">
+                − {formatBRL(stats.totalDiscounts)}
+              </h2>
+              <p className="text-xs text-[#a78bfa]/70 mt-1">
+                Valor total aberto em cupons e promoções no período
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Distribuição de Custos Operacionais */}
         <div>

@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   LogOut,
   Loader2,
+  Ticket,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -56,6 +57,12 @@ const navItems = [
     label: "Insumos",
     icon: Tag,
     description: "Argolas, tags NFC…",
+  },
+  {
+    href: "/dashboard/promocoes",
+    label: "Promoções",
+    icon: Ticket,
+    description: "Cupons e brindes",
   },
 ];
 

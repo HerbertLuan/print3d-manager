@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { useCartStore, useCartHydrated } from "@/lib/cart-store";
-import { createStoreOrder } from "@/lib/firestore";
+import { createStoreOrder, getStoreSettings } from "@/lib/firestore";
 import { formatBRL } from "@/lib/calculations";
 import { logEvent } from "firebase/analytics";
 import { analytics } from "@/lib/firebase";
@@ -19,16 +19,25 @@ import {
   CheckCircle2,
   Package,
   Gift,
+  Tag,
+  XCircle,
+  Ticket,
 } from "lucide-react";
 
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? "5561985592709";
-const GIFT_THRESHOLD = 150; // R$ para ganhar brinde exclusivo
+const DEFAULT_GIFT_THRESHOLD = 150;
 
 // ─── GiftProgressBar ──────────────────────────────────────────────────────────
 
-function GiftProgressBar({ total }: { total: number }) {
-  const pct = Math.min(100, (total / GIFT_THRESHOLD) * 100);
-  const remaining = Math.max(0, GIFT_THRESHOLD - total);
+function GiftProgressBar({
+  subtotal,
+  threshold,
+}: {
+  subtotal: number;
+  threshold: number;
+}) {
+  const pct = Math.min(100, (subtotal / threshold) * 100);
+  const remaining = Math.max(0, threshold - subtotal);
   const earned = pct >= 100;
 
   return (
@@ -62,6 +71,94 @@ function GiftProgressBar({ total }: { total: number }) {
   );
 }
 
+// ─── CouponInput ──────────────────────────────────────────────────────────────
+
+function CouponInput() {
+  const {
+    appliedCoupon,
+    discountValue,
+    couponError,
+    couponLoading,
+    applyCoupon,
+    removeCoupon,
+  } = useCartStore();
+
+  const [code, setCode] = useState("");
+
+  async function handleApply(e: React.FormEvent) {
+    e.preventDefault();
+    await applyCoupon(code);
+    if (!couponError) setCode("");
+  }
+
+  // Cupom aplicado com sucesso — exibe badge
+  if (appliedCoupon) {
+    return (
+      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Ticket className="size-4 text-emerald-400" />
+            <div>
+              <p className="text-xs font-bold text-emerald-400 tracking-widest">
+                {appliedCoupon.code}
+              </p>
+              <p className="text-[10px] text-white/40 mt-0.5">
+                {appliedCoupon.type === "gift"
+                  ? "Brinde incluído no pedido 🎁"
+                  : appliedCoupon.type === "percentage"
+                  ? `${appliedCoupon.value}% de desconto`
+                  : `${formatBRL(appliedCoupon.value)} de desconto`}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={removeCoupon}
+            className="text-white/30 hover:text-red-400 transition"
+            aria-label="Remover cupom"
+          >
+            <XCircle className="size-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleApply} className="flex flex-col gap-1.5">
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Tag className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-white/30" />
+          <input
+            type="text"
+            value={code}
+            onChange={(e) => setCode(e.target.value.toUpperCase())}
+            placeholder="Cupom de desconto"
+            className="h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.03] pl-9 pr-3 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#2563EB]/50 focus:ring-1 focus:ring-[#2563EB]/30 transition"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={couponLoading || !code.trim()}
+          className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#7C3AED] text-xs font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed transition hover:opacity-90 active:scale-95 shrink-0"
+        >
+          {couponLoading ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            "Aplicar"
+          )}
+        </button>
+      </div>
+      {couponError && (
+        <p className="text-[11px] text-red-400 flex items-center gap-1">
+          <XCircle className="size-3 shrink-0" />
+          {couponError}
+        </p>
+      )}
+    </form>
+  );
+}
+
 // ─── CartSheet (Sheet lateral direito) ───────────────────────────────────────
 
 export function CartSheet() {
@@ -72,16 +169,28 @@ export function CartSheet() {
     removeItem,
     updateQuantity,
     clearCart,
-    cartTotal,
+    getSubtotal,
+    getTotal,
     totalItems,
+    appliedCoupon,
+    discountValue,
   } = useCartStore();
 
   const [loading, setLoading] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [confirmedShortCode, setConfirmedShortCode] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [giftThreshold, setGiftThreshold] = useState(DEFAULT_GIFT_THRESHOLD);
 
-  const total = cartTotal();
+  // Busca o gift_threshold dinâmico do Firestore
+  useEffect(() => {
+    getStoreSettings()
+      .then((s) => setGiftThreshold(s.gift_threshold))
+      .catch(() => {}); // silencia erro, usa valor padrão
+  }, []);
+
+  const subtotal = getSubtotal();
+  const total = getTotal();
   const itemCount = totalItems();
 
   async function handleCheckout(e: React.FormEvent) {
@@ -92,20 +201,12 @@ export function CartSheet() {
     setError("");
 
     try {
-      // 📊 GA4: generate_lead — funil de venda: usuário clicou em "Finalizar Pedido"
-      // Disparado ANTES do Firestore para não perder o evento caso ocorra erro
       await analytics.then((a) => {
         if (!a) return;
-        logEvent(a, "generate_lead", {
-          currency: "BRL",
-          value: total, // total já com desconto de cupom (se implementado)
-        });
+        logEvent(a, "generate_lead", { currency: "BRL", value: total });
       });
 
-      // Gera um short code (ex: A7F2)
       const shortCode = Math.random().toString(36).substring(2, 6).toUpperCase();
-
-      // Monta item principal para campos legados obrigatórios
       const firstItem = items[0];
       const allNames = items
         .map((i) => `${i.quantity}x ${i.displayName}`)
@@ -116,10 +217,11 @@ export function CartSheet() {
         cliente_telefone: "Aguardando WhatsApp",
         cart_items: items,
         valor_total: total,
+        coupon_code: appliedCoupon?.code,
+        discount_amount: discountValue > 0 ? discountValue : undefined,
         origem: "site",
         production_status: "pending_approval",
         payment_status: "Pendente",
-        // Campos legados (obrigatórios pelo schema Order)
         instagram_handle: `Pedido Web #${shortCode}`,
         catalog_item_id: firstItem.catalogItemId,
         piece_name: allNames,
@@ -130,19 +232,22 @@ export function CartSheet() {
 
       setOrderId(id);
       setConfirmedShortCode(shortCode);
-
-      // Limpa carrinho
       clearCart();
 
-      // Gera e abre link do WhatsApp
+      // Monta mensagem para WhatsApp incluindo desconto se houver
       const itemsList = items
         .map((i) => `• ${i.quantity}x ${i.displayName} — ${formatBRL(i.unitPrice * i.quantity)}`)
         .join("\n");
 
+      const discountLine =
+        discountValue > 0
+          ? `\n🏷️ Cupom *${appliedCoupon?.code}*: -${formatBRL(discountValue)}`
+          : "";
+
       const msg = encodeURIComponent(
         `Olá! Fiz o pedido *#${shortCode}* no site. Segue o resumo:\n\n` +
-        `${itemsList}\n\n` +
-        `*Total: ${formatBRL(total)}*`
+          `${itemsList}${discountLine}\n\n` +
+          `*Total: ${formatBRL(total)}*`
       );
 
       window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, "_blank");
@@ -161,9 +266,6 @@ export function CartSheet() {
     closeCart();
   }
 
-  // Guard de hidratação: o servidor renderiza sem acesso ao localStorage.
-  // Se renderizarmos isOpen=true no cliente (vindo do persist), ocorre mismatch.
-  // Retornamos null até o componente estar montado no cliente.
   const hydrated = useCartHydrated();
   if (!hydrated || !isOpen) return null;
 
@@ -185,9 +287,7 @@ export function CartSheet() {
         <div className="flex items-center justify-between px-6 py-5 border-b border-white/[0.07]">
           <div className="flex items-center gap-2.5">
             <ShoppingBag className="h-5 w-5 text-primary" />
-            <h2 className="font-semibold text-white text-base">
-              Meu Carrinho
-            </h2>
+            <h2 className="font-semibold text-white text-base">Meu Carrinho</h2>
             {itemCount > 0 && (
               <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-r from-primary to-secondary text-[10px] font-bold text-white shadow-[0_0_12px_rgba(37,99,235,0.3)]">
                 {itemCount}
@@ -342,15 +442,54 @@ export function CartSheet() {
                 </div>
               </div>
 
-              {/* Barra de Brinde (ticket médio) */}
-              <GiftProgressBar total={total} />
+              {/* Barra de Brinde (gift_threshold dinâmico) */}
+              <GiftProgressBar subtotal={subtotal} threshold={giftThreshold} />
 
-              {/* Total */}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-white/50">Total</span>
-                <span className="text-2xl font-bold text-white tabular-nums">
-                  {formatBRL(total)}
-                </span>
+              {/* Campo de cupom */}
+              <CouponInput />
+
+              {/* Resumo de valores */}
+              <div className="space-y-1.5">
+                {/* Subtotal */}
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-white/40">Subtotal</span>
+                  <span className="text-white/70 tabular-nums">{formatBRL(subtotal)}</span>
+                </div>
+
+                {/* Linha de desconto (visível apenas com cupom ativo) */}
+                {appliedCoupon && discountValue > 0 && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-emerald-400 flex items-center gap-1">
+                      <Ticket className="size-3.5" />
+                      Desconto ({appliedCoupon.code})
+                    </span>
+                    <span className="text-emerald-400 font-bold tabular-nums">
+                      − {formatBRL(discountValue)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Brinde gift sem valor numérico */}
+                {appliedCoupon?.type === "gift" && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-[#FACC15] flex items-center gap-1">
+                      <Gift className="size-3.5" />
+                      Brinde ({appliedCoupon.code})
+                    </span>
+                    <span className="text-[#FACC15] font-bold">Incluso</span>
+                  </div>
+                )}
+
+                {/* Separador */}
+                <div className="h-px bg-white/[0.06]" />
+
+                {/* Total */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-white/50">Total</span>
+                  <span className="text-2xl font-bold text-white tabular-nums">
+                    {formatBRL(total)}
+                  </span>
+                </div>
               </div>
 
               {/* Botão Finalizar */}
@@ -393,7 +532,6 @@ export function CartSheet() {
 export function CartFab() {
   const { openCart, totalItems } = useCartStore();
   const hydrated = useCartHydrated();
-  // Durante SSR e 1ª renderização do cliente, count=0 para igualar o HTML do servidor
   const count = hydrated ? totalItems() : 0;
 
   return (

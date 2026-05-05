@@ -1,6 +1,33 @@
 import { Timestamp } from "firebase/firestore";
 
 // =====================================================
+// PROMOTIONS TYPES (Cupons e Configurações da Loja)
+// =====================================================
+
+export type CouponType = "percentage" | "fixed" | "gift";
+
+export interface Coupon {
+  id: string;
+  /** Código do cupom em maiúsculas (ex: "EVINS10") */
+  code: string;
+  type: CouponType;
+  /** Valor do desconto: percentual (0-100) ou fixo em R$. Zero para tipo 'gift'. */
+  value: number;
+  /** Valor mínimo de compra para o cupom ser aceito (R$) */
+  min_purchase_value: number;
+  /** Se false, o cupom não pode ser aplicado */
+  active: boolean;
+  created_at: Timestamp;
+}
+
+export type NewCoupon = Omit<Coupon, "id">;
+
+export interface StoreSettings {
+  /** Valor mínimo para o cliente ganhar um brinde (R$) */
+  gift_threshold: number;
+}
+
+// =====================================================
 // FILAMENT TYPES (Estoque de Bobinas Físicas)
 // =====================================================
 
@@ -215,6 +242,10 @@ export interface Order {
   payment_status: PaymentStatus;
   paid_at?: string; // Data de Pagamento para fluxo de caixa (YYYY-MM-DD)
   production_status: ProductionStatus;
+  /** Código do cupom aplicado no pedido */
+  coupon_code?: string;
+  /** Valor total de desconto concedido (R$) */
+  discount_amount?: number;
   created_at: Timestamp;
 }
 
@@ -242,6 +273,8 @@ export interface StoreOrder {
   cliente_telefone: string;
   cart_items: CartItem[];
   valor_total: number;
+  coupon_code?: string;
+  discount_amount?: number;
   origem: "site";
   production_status: "pending_approval";
   payment_status: "Pendente";
