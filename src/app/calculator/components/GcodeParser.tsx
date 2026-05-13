@@ -16,47 +16,201 @@ interface GcodeParserProps {
   onDataExtracted: (data: GcodeData) => void;
 }
 
-// ─── Regex Patterns (Bambu Studio G-code) ─────────────────────────────────────
+// ─── File Format Detection ────────────────────────────────────────────────────
+
+function is3mfFile(name: string): boolean {
+  return name.toLowerCase().endsWith(".3mf");
+}
+
+function isGcodeFile(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.endsWith(".gcode") || lower.endsWith(".gcode.3mf");
+}
+
+// ─── Regex Patterns (Bambu Studio real output) ───────────────────────────────
 
 /**
- * Matches lines such as:
+ * Bambu Studio (AMS multi-filament) format:
+ *   ; total filament weight [g] : 56.51,1.96,1.76
+ * The first value is the dominant filament. We sum all values.
+ *
+ * Also matches older single-extruder format:
  *   ; filament used [g] = 12.34
  *   ; total filament used [g] = 12.34
  */
-const WEIGHT_REGEX =
-  /;\s*(?:total\s+)?filament\s+used\s*\[g\]\s*=\s*([\d.]+)/i;
+const WEIGHT_MULTI_REGEX =
+  /;\s*total\s+filament\s+weight\s*\[g\]\s*[=:]\s*([\d.,]+)/i;
+
+const WEIGHT_LEGACY_REGEX =
+  /;\s*(?:total\s+)?filament\s+(?:used|weight)\s*\[g\]\s*[=:]\s*([\d.]+)/i;
 
 /**
- * Matches the Bambu Studio time line, e.g.:
+ * Bambu Studio packs both times on one line:
+ *   ; model printing time: 3h 43m 28s; total estimated time: 3h 50m 37s
+ *
+ * We prefer "total estimated time" and fall back to "model printing time".
+ *
+ * Also matches:
  *   ; estimated printing time (normal mode) = 1h 25m 30s
- *   ; estimated printing time (normal mode) = 45m 12s
- *   ; estimated printing time (normal mode) = 2h 3m
- *   ; estimated printing time = 1h 30m
- * Captures optional hours, optional minutes, optional seconds.
+ *   ; estimated printing time = 45m 12s
  */
-const TIME_REGEX =
-  /;\s*estimated printing time(?:\s*\([^)]*\))?\s*=\s*(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s)?/i;
+const TIME_TOTAL_REGEX =
+  /total\s+estimated\s+time[=:\s]+(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s)?/i;
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+const TIME_MODEL_REGEX =
+  /model\s+printing\s+time[=:\s]+(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s)?/i;
 
-function parseGcode(text: string): GcodeData | null {
-  const weightMatch = text.match(WEIGHT_REGEX);
-  const timeMatch = text.match(TIME_REGEX);
+const TIME_LEGACY_REGEX =
+  /;\s*estimated\s+printing\s+time(?:\s*\([^)]*\))?\s*[=:]\s*(?:(\d+)h\s*)?(?:(\d+)m\s*)?(?:(\d+)s)?/i;
 
-  if (!weightMatch && !timeMatch) return null;
+// ─── Core Parser ──────────────────────────────────────────────────────────────
 
-  const weightInGrams = weightMatch ? parseFloat(weightMatch[1]) : 0;
+function parseGcodeText(text: string): GcodeData | null {
+  // --- Weight ---
+  let weightInGrams = 0;
 
-  const hours = timeMatch?.[1] ? parseInt(timeMatch[1], 10) : 0;
-  const minutes = timeMatch?.[2] ? parseInt(timeMatch[2], 10) : 0;
-  const seconds = timeMatch?.[3] ? parseInt(timeMatch[3], 10) : 0;
-  const timeInHours = hours + minutes / 60 + seconds / 3600;
+  const multiMatch = text.match(WEIGHT_MULTI_REGEX);
+  if (multiMatch) {
+    // Sum all comma-separated weights (e.g. "56.51,1.96,1.76" → 60.23)
+    weightInGrams = multiMatch[1]
+      .split(",")
+      .reduce((sum, v) => sum + (parseFloat(v.trim()) || 0), 0);
+  } else {
+    const legacyMatch = text.match(WEIGHT_LEGACY_REGEX);
+    if (legacyMatch) weightInGrams = parseFloat(legacyMatch[1]);
+  }
+
+  // --- Time ---
+  function matchToHours(m: RegExpMatchArray | null): number {
+    if (!m) return 0;
+    const h = m[1] ? parseInt(m[1], 10) : 0;
+    const min = m[2] ? parseInt(m[2], 10) : 0;
+    const s = m[3] ? parseInt(m[3], 10) : 0;
+    return h + min / 60 + s / 3600;
+  }
+
+  let timeInHours =
+    matchToHours(text.match(TIME_TOTAL_REGEX)) ||
+    matchToHours(text.match(TIME_MODEL_REGEX)) ||
+    matchToHours(text.match(TIME_LEGACY_REGEX));
+
+  if (weightInGrams === 0 && timeInHours === 0) return null;
 
   return {
     weightInGrams: Math.round(weightInGrams * 100) / 100,
     timeInHours: Math.round(timeInHours * 100) / 100,
   };
 }
+
+// ─── ZIP / 3MF Extraction ────────────────────────────────────────────────────
+
+/**
+ * Reads a .3mf file (ZIP container) using the native DecompressionStream API
+ * available in modern browsers — no external library needed.
+ *
+ * 3MF stores the G-code slice at:  Metadata/plate_1.gcode  (or plate_N.gcode)
+ *
+ * We scan the ZIP central directory to find it, then inflate the entry.
+ */
+async function extractGcodeFrom3mf(file: File): Promise<string> {
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+
+  // Find ZIP End-of-Central-Directory record (signature 0x06054b50)
+  // Walk backwards from end of file
+  let eocdOffset = -1;
+  for (let i = bytes.length - 22; i >= 0; i--) {
+    if (
+      bytes[i] === 0x50 &&
+      bytes[i + 1] === 0x4b &&
+      bytes[i + 2] === 0x05 &&
+      bytes[i + 3] === 0x06
+    ) {
+      eocdOffset = i;
+      break;
+    }
+  }
+  if (eocdOffset < 0) throw new Error("EOCD record not found — not a valid ZIP.");
+
+  const view = new DataView(buffer);
+  const cdSize = view.getUint32(eocdOffset + 12, true);
+  const cdOffset = view.getUint32(eocdOffset + 16, true);
+
+  // Walk the Central Directory and find all plate_N.gcode entries
+  const decoder = new TextDecoder("utf-8");
+  let pos = cdOffset;
+  let gcodeEntries: { name: string; localOffset: number; compressedSize: number; method: number }[] = [];
+
+  while (pos < cdOffset + cdSize) {
+    if (
+      bytes[pos] !== 0x50 ||
+      bytes[pos + 1] !== 0x4b ||
+      bytes[pos + 2] !== 0x01 ||
+      bytes[pos + 3] !== 0x02
+    )
+      break;
+
+    const method = view.getUint16(pos + 10, true);
+    const compressedSize = view.getUint32(pos + 20, true);
+    const fileNameLen = view.getUint16(pos + 28, true);
+    const extraLen = view.getUint16(pos + 30, true);
+    const commentLen = view.getUint16(pos + 32, true);
+    const localOffset = view.getUint32(pos + 42, true);
+    const name = decoder.decode(bytes.slice(pos + 46, pos + 46 + fileNameLen));
+
+    if (/Metadata\/plate_\d+\.gcode$/i.test(name)) {
+      gcodeEntries.push({ name, localOffset, compressedSize, method });
+    }
+
+    pos += 46 + fileNameLen + extraLen + commentLen;
+  }
+
+  if (gcodeEntries.length === 0) {
+    throw new Error("Nenhum arquivo .gcode encontrado dentro do .3mf.");
+  }
+
+  // Sort: plate_1 first
+  gcodeEntries.sort((a, b) => a.name.localeCompare(b.name));
+  const entry = gcodeEntries[0];
+
+  // Navigate to local file header to get actual data offset
+  const localHeaderPos = entry.localOffset;
+  const localFileNameLen = view.getUint16(localHeaderPos + 26, true);
+  const localExtraLen = view.getUint16(localHeaderPos + 28, true);
+  const dataStart = localHeaderPos + 30 + localFileNameLen + localExtraLen;
+
+  const compressedData = bytes.slice(dataStart, dataStart + entry.compressedSize);
+
+  // Method 0 = stored (no compression), Method 8 = deflated
+  if (entry.method === 0) {
+    return decoder.decode(compressedData);
+  } else if (entry.method === 8) {
+    // Use native DecompressionStream (Chrome 80+, Firefox 113+, Safari 16.4+)
+    const ds = new DecompressionStream("deflate-raw");
+    const writer = ds.writable.getWriter();
+    writer.write(compressedData);
+    writer.close();
+    const chunks: Uint8Array[] = [];
+    const reader = ds.readable.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    const total = chunks.reduce((s, c) => s + c.length, 0);
+    const out = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      out.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return decoder.decode(out);
+  } else {
+    throw new Error(`Método de compressão ZIP não suportado: ${entry.method}`);
+  }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatDecimalTime(hours: number): string {
   const h = Math.floor(hours);
@@ -78,10 +232,11 @@ export function GcodeParser({ onDataExtracted }: GcodeParserProps) {
   // ── File Processing ──────────────────────────────────────────────────────────
 
   const processFile = useCallback(
-    (file: File) => {
-      if (!file.name.toLowerCase().endsWith(".gcode")) {
+    async (file: File) => {
+      if (!isGcodeFile(file.name)) {
         toast.error("Formato inválido", {
-          description: "Apenas arquivos .gcode do Bambu Studio são aceitos.",
+          description:
+            "Aceito apenas arquivos .gcode ou .gcode.3mf exportados pelo Bambu Studio.",
         });
         return;
       }
@@ -89,16 +244,23 @@ export function GcodeParser({ onDataExtracted }: GcodeParserProps) {
       setIsReading(true);
       setFileName(file.name);
 
-      const reader = new FileReader();
+      try {
+        let gcodeText: string;
 
-      reader.onload = (e) => {
-        const text = e.target?.result as string;
-        const data = parseGcode(text);
+        if (is3mfFile(file.name)) {
+          // .3mf → unzip → extract Metadata/plate_1.gcode
+          gcodeText = await extractGcodeFrom3mf(file);
+        } else {
+          // Plain .gcode → read as text
+          gcodeText = await file.text();
+        }
 
-        if (!data || (data.weightInGrams === 0 && data.timeInHours === 0)) {
+        const data = parseGcodeText(gcodeText);
+
+        if (!data) {
           toast.error("Metadados não encontrados", {
             description:
-              "Não foi possível extrair peso e tempo. Verifique se o arquivo foi gerado pelo Bambu Studio.",
+              "Não foi possível extrair peso e tempo. Verifique se o fatiamento foi concluído no Bambu Studio.",
           });
           setIsReading(false);
           setFileName("");
@@ -112,17 +274,12 @@ export function GcodeParser({ onDataExtracted }: GcodeParserProps) {
         toast.success("G-code lido com sucesso!", {
           description: `${data.weightInGrams}g · ${formatDecimalTime(data.timeInHours)}`,
         });
-      };
-
-      reader.onerror = () => {
-        toast.error("Erro ao ler o arquivo", {
-          description: "Não foi possível ler o arquivo. Tente novamente.",
-        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Erro desconhecido";
+        toast.error("Falha ao processar o arquivo", { description: message });
         setIsReading(false);
         setFileName("");
-      };
-
-      reader.readAsText(file, "utf-8");
+      }
     },
     [onDataExtracted]
   );
@@ -156,7 +313,6 @@ export function GcodeParser({ onDataExtracted }: GcodeParserProps) {
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (file) processFile(file);
-      // Reset input so the same file can be re-selected after clearing
       e.target.value = "";
     },
     [processFile]
@@ -171,24 +327,20 @@ export function GcodeParser({ onDataExtracted }: GcodeParserProps) {
 
   if (parsedData) {
     return (
-      <SuccessState
-        data={parsedData}
-        fileName={fileName}
-        onClear={handleClear}
-      />
+      <SuccessState data={parsedData} fileName={fileName} onClear={handleClear} />
     );
   }
 
   return (
     <>
-      {/* Hidden file input */}
+      {/* Hidden file input — accepts both plain gcode and 3mf containers */}
       <input
         ref={inputRef}
         type="file"
-        accept=".gcode"
+        accept=".gcode,.3mf"
         className="sr-only"
         onChange={handleFileInputChange}
-        aria-label="Selecionar arquivo .gcode"
+        aria-label="Selecionar arquivo .gcode ou .3mf"
       />
 
       <button
@@ -198,9 +350,9 @@ export function GcodeParser({ onDataExtracted }: GcodeParserProps) {
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
         disabled={isReading}
-        aria-label="Área de drag and drop para arquivo .gcode"
+        aria-label="Área de drag and drop para arquivo .gcode ou .3mf"
         className={[
-          "w-full rounded-xl border-2 border-dashed transition-all duration-300 cursor-pointer",
+          "relative w-full rounded-xl border-2 border-dashed transition-all duration-300 cursor-pointer",
           "flex flex-col items-center justify-center gap-3 py-8 px-6 text-center",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           "disabled:pointer-events-none disabled:opacity-60",
@@ -213,9 +365,7 @@ export function GcodeParser({ onDataExtracted }: GcodeParserProps) {
         <div
           className={[
             "relative flex items-center justify-center w-14 h-14 rounded-2xl transition-all duration-300",
-            isDragOver
-              ? "bg-primary/20 text-primary"
-              : "bg-white/5 text-white/40",
+            isDragOver ? "bg-primary/20 text-primary" : "bg-white/5 text-white/40",
           ].join(" ")}
         >
           {isReading ? (
@@ -251,31 +401,34 @@ export function GcodeParser({ onDataExtracted }: GcodeParserProps) {
             ].join(" ")}
           >
             {isReading
-              ? `Lendo ${fileName}…`
+              ? `Processando ${fileName}…`
               : isDragOver
               ? "Solte o arquivo aqui"
-              : "Arraste o arquivo .gcode do Bambu Studio aqui"}
+              : "Arraste o arquivo do Bambu Studio aqui"}
           </p>
           {!isReading && (
             <p className="text-xs text-white/30">
-              ou{" "}
-              <span className="underline underline-offset-2 text-white/50">
+              Suporta{" "}
+              <span className="text-white/50 font-mono">.gcode</span> e{" "}
+              <span className="text-white/50 font-mono">.gcode.3mf</span>
+              {" · "}
+              <span className="underline underline-offset-2 text-white/40">
                 clique para selecionar
               </span>
             </p>
           )}
         </div>
 
-        {/* Animated border glow on drag over */}
+        {/* Animated glow on drag */}
         {isDragOver && (
-          <div className="absolute inset-0 rounded-xl pointer-events-none ring-2 ring-primary/40 ring-offset-0 animate-pulse" />
+          <div className="absolute inset-0 rounded-xl pointer-events-none ring-2 ring-primary/40 animate-pulse" />
         )}
       </button>
     </>
   );
 }
 
-// ─── Success State Sub-component ──────────────────────────────────────────────
+// ─── Success State ────────────────────────────────────────────────────────────
 
 interface SuccessStateProps {
   data: GcodeData;
@@ -286,18 +439,16 @@ interface SuccessStateProps {
 function SuccessState({ data, fileName, onClear }: SuccessStateProps) {
   return (
     <div className="w-full rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-5 py-4 flex items-center gap-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      {/* Check icon */}
       <div className="shrink-0 w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
         <CheckCircle2 className="w-5 h-5" />
       </div>
 
-      {/* Data */}
       <div className="flex-1 min-w-0">
         <p className="text-xs text-emerald-400/70 font-medium truncate mb-1">
           {fileName}
         </p>
         <div className="flex items-center gap-3 flex-wrap">
-          <Pill label="Peso" value={`${data.weightInGrams}g`} />
+          <Pill label="Peso Total" value={`${data.weightInGrams}g`} />
           <span className="text-white/20 text-xs">·</span>
           <Pill
             label="Tempo"
@@ -306,7 +457,6 @@ function SuccessState({ data, fileName, onClear }: SuccessStateProps) {
         </div>
       </div>
 
-      {/* Clear button */}
       <Button
         variant="ghost"
         size="icon"
@@ -319,8 +469,6 @@ function SuccessState({ data, fileName, onClear }: SuccessStateProps) {
     </div>
   );
 }
-
-// ─── Pill ─────────────────────────────────────────────────────────────────────
 
 function Pill({ label, value }: { label: string; value: string }) {
   return (
