@@ -85,7 +85,7 @@ function CouponInput() {
 
   const [code, setCode] = useState("");
 
-  async function handleApply(e: React.FormEvent) {
+  async function handleApply(e: React.FormEvent | React.MouseEvent | React.KeyboardEvent) {
     e.preventDefault();
     await applyCoupon(code);
     if (!couponError) setCode("");
@@ -125,7 +125,7 @@ function CouponInput() {
   }
 
   return (
-    <form onSubmit={handleApply} className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-1.5">
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Tag className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-white/30" />
@@ -133,12 +133,19 @@ function CouponInput() {
             type="text"
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleApply(e);
+              }
+            }}
             placeholder="Cupom de desconto"
             className="h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.03] pl-9 pr-3 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#2563EB]/50 focus:ring-1 focus:ring-[#2563EB]/30 transition"
           />
         </div>
         <button
-          type="submit"
+          type="button"
+          onClick={handleApply}
           disabled={couponLoading || !code.trim()}
           className="h-10 px-4 rounded-xl bg-gradient-to-r from-[#2563EB] to-[#7C3AED] text-xs font-bold text-white disabled:opacity-50 disabled:cursor-not-allowed transition hover:opacity-90 active:scale-95 shrink-0"
         >
@@ -155,7 +162,7 @@ function CouponInput() {
           {couponError}
         </p>
       )}
-    </form>
+    </div>
   );
 }
 

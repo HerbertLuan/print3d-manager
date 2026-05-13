@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Calculator, Save, TrendingUp, Zap, Clock, Plus, Trash2 } from "lucide-react";
+import { GcodeParser, GcodeData } from "./components/GcodeParser";
 import {
   Card,
   CardContent,
@@ -48,6 +49,20 @@ export default function CalculatorPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const handleGcodeData = useCallback((data: GcodeData) => {
+    const totalHours = Math.floor(data.timeInHours);
+    const totalMinutes = Math.round((data.timeInHours - totalHours) * 60);
+    setForm((prev) => ({
+      ...prev,
+      timeHours: String(totalHours),
+      timeMinutes: String(totalMinutes),
+      required_filaments: prev.required_filaments.map((f, i) =>
+        i === 0 ? { ...f, weight: String(data.weightInGrams) } : f
+      ),
+    }));
+    setResult(null);
+  }, []);
 
   function handleGenericChange(field: keyof CalculatorFormData, value: string) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -176,7 +191,12 @@ export default function CalculatorPage() {
               <CardDescription>Insira as especificações da impressão</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
-              
+
+              {/* G-code Parser */}
+              <div className="space-y-2">
+                <GcodeParser onDataExtracted={handleGcodeData} />
+              </div>
+
               {/* Dynamic Filaments Array */}
               <div className="space-y-3">
                  <Label>Materiais Utilizados</Label>
