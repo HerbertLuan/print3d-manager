@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
-import { Calculator, Save, TrendingUp, Zap, Clock, Plus, Trash2 } from "lucide-react";
+import { useCallback, useState, useEffect, useMemo } from "react";
+import { Calculator, Save, TrendingUp, Zap, Clock, Plus, Trash2, ShoppingCart, CheckCircle2, Tag, Sparkles } from "lucide-react";
 import { GcodeParser, GcodeData } from "./components/GcodeParser";
 import {
   Card,
@@ -24,15 +24,25 @@ import { ResponsiveModal } from "@/components/ui/responsive-modal";
 import { ImageUpload } from "@/components/ui/image-upload";
 import {
   calculatePrintCost,
+  calculateBatchTimeAndCost,
   formatBRL,
   formatTime,
   MATERIAL_OPTIONS,
   DEFAULT_PROFIT_MARGIN,
   CostCalculationResult,
 } from "@/lib/calculations";
-import { addCatalogItem } from "@/lib/firestore";
+import { addCatalogItem, addOrder, getSupplies, getCatalogItems } from "@/lib/firestore";
 import { uploadImage } from "@/lib/storage";
-import { CalculatorFormData } from "@/lib/types";
+import { CalculatorFormData, Supply, SelectedSupply, CatalogItem } from "@/lib/types";
+import { Checkbox } from "@/components/ui/checkbox";
+
+function normalizeItem(item: CatalogItem): { material: string; weight_grams: number } {
+  const rf = item.required_filaments;
+  if (Array.isArray(rf) && rf.length > 0) {
+    return { material: rf[0].material ?? "PLA", weight_grams: rf[0].weight_grams ?? 0 };
+  }
+  return { material: item.material ?? "PLA", weight_grams: item.weight_grams ?? 0 };
+}
 
 export default function CalculatorPage() {
   const [form, setForm] = useState<CalculatorFormData>({
@@ -49,6 +59,34 @@ export default function CalculatorPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // ── Gerar Pedido state ──
+  const [orderDialogOpen, setOrderDialogOpen] = useState(false);
+  const [orderPieceName, setOrderPieceName] = useState("");
+  const [orderClientName, setOrderClientName] = useState("");
+  const [orderSalePrice, setOrderSalePrice] = useState("");
+  const [ordering, setOrdering] = useState(false);
+  const [orderSuccess, setOrderSuccess] = useState(false);
+
+  // ── Insumos state ──
+  const [availableSupplies, setAvailableSupplies] = useState<Supply[]>([]);
+  const [selectedSupplies, setSelectedSupplies] = useState<Record<string, number>>({});
+
+  // ── Produtos Catalogados state ──
+  const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
+  const [pickItemId, setPickItemId] = useState("");
+  const [pickQty, setPickQty] = useState("1");
+  const [extraLineItems, setExtraLineItems] = useState<{
+    item: CatalogItem;
+    qty: number;
+    unitPrice: number;
+    batchStats: ReturnType<typeof calculateBatchTimeAndCost>;
+  }[]>([]);
+
+  useEffect(() => {
+    getSupplies().then(setAvailableSupplies).catch(console.error);
+    getCatalogItems().then(setCatalogItems).catch(console.error);
+  }, []);
 
   const handleGcodeData = useCallback((data: GcodeData) => {
     const totalHours = Math.floor(data.timeInHours);
@@ -157,6 +195,169 @@ export default function CalculatorPage() {
     }
   }
 
+  const suppliesCostTotal = useMemo(() => {
+    return Object.entries(selectedSupplies).reduce((sum, [id, qty]) => {
+      const supply = availableSupplies.find(s => s.id === id);
+      return sum + (supply ? supply.unit_cost * qty : 0);
+    }, 0);
+  }, [selectedSupplies, availableSupplies]);
+
+  const extraItemsCostTotal = useMemo(() => {
+    let batchTotalFilamentCost = 0;
+    let batchTotalMachineCost = 0;
+    let batchTimeInMinutes = 0;
+    let suggestedPrice = 0;
+
+    for (const line of extraLineItems) {
+      batchTotalFilamentCost += line.batchStats.batchTotalFilamentCost;
+      batchTotalMachineCost += line.batchStats.batchTotalMachineCost;
+      batchTimeInMinutes += line.batchStats.batchTimeInMinutes;
+      suggestedPrice += line.unitPrice * line.qty;
+    }
+
+    return {
+      batchTotalFilamentCost,
+      batchTotalMachineCost,
+      batchTimeInMinutes,
+      suggestedPrice,
+    };
+  }, [extraLineItems]);
+
+  const totalCostWithSupplies = (result?.totalBaseCost || 0) + extraItemsCostTotal.batchTotalFilamentCost + extraItemsCostTotal.batchTotalMachineCost + suppliesCostTotal;
+  const currentSalePrice = parseFloat(orderSalePrice) || 0;
+  const grossMarginPercent = currentSalePrice > 0 ? ((currentSalePrice - totalCostWithSupplies) / currentSalePrice) * 100 : 0;
+
+  // Atualiza o preço sugerido quando os insumos ou peças extras mudam
+  useEffect(() => {
+    if (result && orderDialogOpen) {
+      setOrderSalePrice((result.suggestedPrice + suppliesCostTotal + extraItemsCostTotal.suggestedPrice).toFixed(2));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSupplies, extraLineItems]);
+
+  function handleAddExtraLineItem() {
+    const found = catalogItems.find((i) => i.id === pickItemId);
+    if (!found) return;
+    const qty = Math.max(1, parseInt(pickQty) || 1);
+    const norm = normalizeItem(found);
+    const batch = calculateBatchTimeAndCost({
+      unitTimeMinutes: found.time_minutes,
+      quantity: qty,
+      unitFilaments: [norm],
+      profitMarginPercent: DEFAULT_PROFIT_MARGIN * 100,
+    });
+    const unitPrice =
+      found.preco_venda_loja && found.preco_venda_loja > 0
+        ? found.preco_venda_loja
+        : batch.batchSuggestedPrice / qty;
+
+    setExtraLineItems((prev) => [
+      ...prev.filter((l) => l.item.id !== found.id),
+      { item: found, qty, unitPrice, batchStats: batch },
+    ]);
+    setPickItemId("");
+    setPickQty("1");
+  }
+
+  function handleRemoveExtraLineItem(itemId: string) {
+    setExtraLineItems((prev) => prev.filter((l) => l.item.id !== itemId));
+  }
+
+  function openOrderDialog() {
+    if (!result) return;
+    setOrderPieceName("");
+    setOrderClientName("");
+    setSelectedSupplies({});
+    setExtraLineItems([]);
+    setOrderSalePrice(result.suggestedPrice.toFixed(2));
+    setOrderDialogOpen(true);
+  }
+
+  async function handleCreateOrder() {
+    if (!result || !orderPieceName.trim() || !orderClientName.trim()) return;
+    setOrdering(true);
+    try {
+      const salePrice = parseFloat(orderSalePrice) || (result.suggestedPrice + suppliesCostTotal + extraItemsCostTotal.suggestedPrice);
+
+      const filamentsList = form.required_filaments
+        .map(f => ({ material: f.material, weight_grams: parseFloat(f.weight) || 0, color: f.color }))
+        .filter(f => f.weight_grams > 0);
+
+      const primaryMaterial =
+        filamentsList.length === 1
+          ? filamentsList[0].material
+          : filamentsList.length > 1
+          ? "Múltiplos"
+          : "PLA";
+
+      const lineItem = {
+        productId: "avulso",
+        nome: orderPieceName.trim(),
+        quantidade: 1,
+        preco_unitario: salePrice,
+        custo_material_unitario: result.filamentCost,
+        custo_maquina_unitario: result.machineCost,
+        batch_time_minutes: result.timeInMinutes,
+      };
+
+      const suppliesList = Object.entries(selectedSupplies)
+        .map(([id, sq]) => {
+          const s = availableSupplies.find((x) => x.id === id);
+          return s ? { supplyId: id, name: s.name, unit_cost: s.unit_cost, quantity: sq } : null;
+        })
+        .filter(Boolean) as SelectedSupply[];
+
+      const extraLinesPayload = extraLineItems.map((l) => {
+        return {
+          productId: l.item.id,
+          nome: l.item.name,
+          quantidade: l.qty,
+          preco_unitario: l.unitPrice,
+          custo_material_unitario: l.batchStats.batchTotalFilamentCost / l.qty,
+          custo_maquina_unitario: l.batchStats.batchTotalMachineCost / l.qty,
+          batch_time_minutes: l.batchStats.batchTimeInMinutes,
+        };
+      });
+
+      const allItems = [lineItem, ...extraLinesPayload];
+      const pieceNameDisplay = orderPieceName.trim() + (extraLineItems.length > 0 ? ` (+${extraLineItems.length} unid)` : "");
+
+      await addOrder({
+        instagram_handle: orderClientName.trim(),
+        cliente_nome: orderClientName.trim(),
+        catalog_item_id: "avulso",
+        piece_name: pieceNameDisplay,
+        material: primaryMaterial,
+        quantity: 1 + extraLineItems.reduce((acc, l) => acc + l.qty, 0),
+        price: salePrice,
+        payment_status: "Pendente",
+        production_status: "Na Fila",
+        origem: "admin",
+        items: allItems,
+        base_cost: totalCostWithSupplies,
+        machine_cost: result.machineCost + extraItemsCostTotal.batchTotalMachineCost,
+        filament_cost: result.filamentCost + extraItemsCostTotal.batchTotalFilamentCost,
+        batch_time_minutes: result.timeInMinutes + extraItemsCostTotal.batchTimeInMinutes,
+        custo_operacional_total: totalCostWithSupplies,
+        ...(suppliesCostTotal > 0 ? { supplies_cost: suppliesCostTotal } : {}),
+        ...(suppliesList.length > 0 ? { supplies: suppliesList } : {}),
+      });
+
+      setOrderSuccess(true);
+      setOrderDialogOpen(false);
+      setOrderPieceName("");
+      setOrderClientName("");
+      setOrderSalePrice("");
+      setSelectedSupplies({});
+      setExtraLineItems([]);
+      setTimeout(() => setOrderSuccess(false), 4000);
+    } catch (error) {
+      console.error("Erro ao gerar pedido:", error);
+    } finally {
+      setOrdering(false);
+    }
+  }
+
   const isFormValid =
     form.required_filaments.every(f => parseFloat(f.weight) > 0) &&
     form.required_filaments.length > 0 &&
@@ -181,6 +382,12 @@ export default function CalculatorPage() {
         {saveSuccess && (
           <div className="bg-green-500/10 border border-green-500/30 text-green-400 rounded-lg px-4 py-3 text-sm font-medium flex items-center gap-2">
             <Zap className="w-4 h-4" /> Peça salva no catálogo com sucesso!
+          </div>
+        )}
+
+        {orderSuccess && (
+          <div className="bg-primary/10 border border-primary/30 text-primary rounded-lg px-4 py-3 text-sm font-medium flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4" /> Pedido gerado com sucesso! Acesse o <strong className="ml-1">Gerenciador de Pedidos</strong>.
           </div>
         )}
 
@@ -327,15 +534,25 @@ export default function CalculatorPage() {
                   </CardContent>
                 </Card>
 
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="w-full border-dashed border-primary/50 hover:border-primary hover:bg-primary/5 text-primary"
-                  onClick={() => setSaveDialogOpen(true)}
-                >
-                  <Save className="w-4 h-4 mr-2" />
-                  Salvar no Catálogo
-                </Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="w-full border-dashed border-border hover:border-border/80 hover:bg-accent text-muted-foreground"
+                    onClick={() => setSaveDialogOpen(true)}
+                  >
+                    <Save className="w-4 h-4 mr-2" />
+                    Salvar no Catálogo
+                  </Button>
+                  <Button
+                    size="lg"
+                    className="w-full"
+                    onClick={openOrderDialog}
+                  >
+                    <ShoppingCart className="w-4 h-4 mr-2" />
+                    Gerar Pedido
+                  </Button>
+                </div>
               </>
             ) : (
               <Card className="border-border border-dashed h-full min-h-[320px] flex items-center justify-center">
@@ -385,6 +602,258 @@ export default function CalculatorPage() {
             <Button variant="outline" className="w-full sm:w-auto" onClick={() => setSaveDialogOpen(false)} disabled={saving}>Cancelar</Button>
             <Button className="w-full sm:w-auto flex-1" onClick={handleSave} disabled={!pieceName.trim() || saving}>
               {saving ? "Salvando..." : "Salvar Peça"}
+            </Button>
+          </div>
+        </div>
+      </ResponsiveModal>
+
+      {/* Order Modal */}
+      <ResponsiveModal
+        open={orderDialogOpen}
+        onOpenChange={setOrderDialogOpen}
+        title="Gerar Pedido Avulso"
+        description="Cria um pedido direto na fila, sem salvar no catálogo."
+      >
+        <div className="space-y-5 py-2">
+
+          <div className="space-y-2">
+            <Label htmlFor="order-client-name">Cliente / Instagram <span className="text-destructive">*</span></Label>
+            <Input
+              id="order-client-name"
+              placeholder="Ex: @fulano ou João Silva"
+              value={orderClientName}
+              onChange={(e) => setOrderClientName(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="order-piece-name">Nome da Peça (Principal) <span className="text-destructive">*</span></Label>
+            <Input
+              id="order-piece-name"
+              placeholder="Ex: Dragão Articulado 3 Cores"
+              value={orderPieceName}
+              onChange={(e) => setOrderPieceName(e.target.value)}
+            />
+          </div>
+
+          {/* Peça Calculada */}
+          {result && orderPieceName && (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 flex justify-between items-center text-sm">
+              <div className="min-w-0">
+                <p className="font-semibold text-primary truncate">{orderPieceName}</p>
+                <p className="text-xs text-muted-foreground">1× {formatBRL(result.suggestedPrice)}/un</p>
+              </div>
+              <span className="font-bold tabular-nums text-primary shrink-0">{formatBRL(result.suggestedPrice)}</span>
+            </div>
+          )}
+
+          {/* Adicionar Produto ao Pedido */}
+          <div className="space-y-2">
+            <Label>Adicionar Peças do Catálogo (Opcional)</Label>
+            <div className="flex gap-2">
+              <Select value={pickItemId} onValueChange={(v) => setPickItemId(v ?? "")}>
+                <SelectTrigger className="flex-1">
+                  <SelectValue placeholder="Selecione uma peça..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {catalogItems.map((it) => (
+                    <SelectItem key={it.id} value={it.id}>
+                      {it.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                min={1}
+                value={pickQty}
+                onChange={(e) => setPickQty(e.target.value)}
+                className="w-20"
+                placeholder="Qtd"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleAddExtraLineItem}
+                disabled={!pickItemId}
+              >
+                + Add
+              </Button>
+            </div>
+          </div>
+
+          {/* Lista de Itens Extras */}
+          {extraLineItems.length > 0 && (
+            <div className="rounded-lg border border-border bg-muted/20 divide-y divide-border overflow-hidden text-sm">
+              {extraLineItems.map((line) => {
+                const lineTotal = line.unitPrice * line.qty;
+                return (
+                  <div key={line.item.id} className="flex items-center justify-between px-3 py-2 gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{line.item.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {line.qty}× {formatBRL(line.unitPrice)}/un
+                        {line.batchStats.timeSavedInMinutes > 0 && (
+                          <span className="ml-1.5 text-green-400 font-medium">
+                            (−{formatTime(line.batchStats.timeSavedInMinutes)} em lote)
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                    <span className="font-semibold tabular-nums text-foreground shrink-0">
+                      {formatBRL(lineTotal)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExtraLineItem(line.item.id)}
+                      className="text-muted-foreground hover:text-destructive transition shrink-0 ml-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {availableSupplies.length > 0 && (
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <Tag className="w-4 h-4" /> Insumos Extras
+              </Label>
+              <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 p-3 max-h-48 overflow-y-auto">
+                {availableSupplies.map((supply) => (
+                  <div key={supply.id} className="flex items-center gap-3">
+                    <Checkbox
+                      id={`supply-${supply.id}`}
+                      checked={selectedSupplies[supply.id] !== undefined}
+                      onCheckedChange={(c) =>
+                        setSelectedSupplies((p) =>
+                          c
+                            ? { ...p, [supply.id]: 1 }
+                            : Object.fromEntries(
+                                Object.entries(p).filter(([k]) => k !== supply.id)
+                              )
+                        )
+                      }
+                    />
+                    <label
+                      htmlFor={`supply-${supply.id}`}
+                      className="flex-1 cursor-pointer text-sm font-medium"
+                    >
+                      {supply.name}
+                    </label>
+                    <span className="text-xs text-muted-foreground tabular-nums shrink-0">
+                      {formatBRL(supply.unit_cost)}/un
+                    </span>
+                    {selectedSupplies[supply.id] !== undefined && (
+                      <Input
+                        type="number"
+                        min={1}
+                        value={selectedSupplies[supply.id]}
+                        onChange={(e) =>
+                          setSelectedSupplies((p) => ({
+                            ...p,
+                            [supply.id]: parseInt(e.target.value) || 1,
+                          }))
+                        }
+                        className="w-16 h-7 px-1 text-center"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {result && (
+            <>
+              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2.5 flex items-center justify-between text-sm">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>Tempo Estimado Total (lote)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold tabular-nums">
+                    {formatTime(result.timeInMinutes + extraItemsCostTotal.batchTimeInMinutes)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1.5 text-sm">
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Filamento (lote)</span>
+                  <span className="font-medium tabular-nums">
+                    {formatBRL(result.filamentCost + extraItemsCostTotal.batchTotalFilamentCost)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-muted-foreground">Máquina (lote)</span>
+                  <span className="font-medium tabular-nums">
+                    {formatBRL(result.machineCost + extraItemsCostTotal.batchTotalMachineCost)}
+                  </span>
+                </div>
+                {suppliesCostTotal > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Insumos</span>
+                    <span className="font-medium tabular-nums">
+                      {formatBRL(suppliesCostTotal)}
+                    </span>
+                  </div>
+                )}
+                <div className="border-t border-border pt-1.5 flex justify-between items-center font-semibold">
+                  <span>Custo Total</span>
+                  <span className="tabular-nums">{formatBRL(totalCostWithSupplies)}</span>
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2" htmlFor="order-sale-price">
+              <Sparkles className="w-4 h-4 text-primary" />
+              Preço de Venda (R$)
+            </Label>
+            <Input
+              id="order-sale-price"
+              type="number"
+              min={0}
+              step={0.01}
+              placeholder="0,00"
+              value={orderSalePrice}
+              onChange={(e) => setOrderSalePrice(e.target.value)}
+            />
+            {result && parseFloat(orderSalePrice) > 0 && (
+              <p
+                className={`text-xs font-semibold ${
+                  grossMarginPercent < 0
+                    ? "text-red-400"
+                    : grossMarginPercent < 40
+                    ? "text-amber-400"
+                    : "text-green-400"
+                }`}
+              >
+                Margem Bruta: {grossMarginPercent.toFixed(1)}%
+              </p>
+            )}
+          </div>
+
+          <div className="flex flex-col-reverse sm:flex-row gap-2 mt-4">
+            <Button
+              variant="outline"
+              className="w-full sm:w-auto"
+              onClick={() => setOrderDialogOpen(false)}
+              disabled={ordering}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="w-full sm:w-auto flex-1"
+              onClick={handleCreateOrder}
+              disabled={!orderPieceName.trim() || !orderClientName.trim() || ordering}
+            >
+              <ShoppingCart className="w-4 h-4 mr-2" />
+              {ordering ? "Gerando..." : "Gerar Pedido"}
             </Button>
           </div>
         </div>
