@@ -14,6 +14,7 @@ import {
   LogOut,
   Loader2,
   Ticket,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -63,6 +64,12 @@ const navItems = [
     label: "Promoções",
     icon: Ticket,
     description: "Cupons e brindes",
+  },
+  {
+    href: "/partners",
+    label: "Parceiros",
+    icon: Users,
+    description: "Comissões de vendas",
   },
 ];
 

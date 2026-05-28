@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState, useEffect, useMemo } from "react";
-import { Calculator, Save, TrendingUp, Zap, Clock, Plus, Trash2, ShoppingCart, CheckCircle2, Tag, Sparkles } from "lucide-react";
+import { Calculator, Save, TrendingUp, Zap, Clock, Plus, Trash2, ShoppingCart, CheckCircle2, Tag, Sparkles, Users } from "lucide-react";
 import { GcodeParser, GcodeData } from "./components/GcodeParser";
 import {
   Card,
@@ -31,9 +31,9 @@ import {
   DEFAULT_PROFIT_MARGIN,
   CostCalculationResult,
 } from "@/lib/calculations";
-import { addCatalogItem, addOrder, getSupplies, getCatalogItems } from "@/lib/firestore";
+import { addCatalogItem, addOrder, getSupplies, getCatalogItems, getActivePartners } from "@/lib/firestore";
 import { uploadImage } from "@/lib/storage";
-import { CalculatorFormData, Supply, SelectedSupply, CatalogItem } from "@/lib/types";
+import { CalculatorFormData, Supply, SelectedSupply, CatalogItem, Partner } from "@/lib/types";
 import { Checkbox } from "@/components/ui/checkbox";
 
 function normalizeItem(item: CatalogItem): { material: string; weight_grams: number } {
@@ -67,6 +67,7 @@ export default function CalculatorPage() {
   const [orderSalePrice, setOrderSalePrice] = useState("");
   const [ordering, setOrdering] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
+  const [orderPartnerId, setOrderPartnerId] = useState("");
 
   // ── Insumos state ──
   const [availableSupplies, setAvailableSupplies] = useState<Supply[]>([]);
@@ -83,9 +84,13 @@ export default function CalculatorPage() {
     batchStats: ReturnType<typeof calculateBatchTimeAndCost>;
   }[]>([]);
 
+  // ── Parceiros ──
+  const [partners, setPartners] = useState<Partner[]>([]);
+
   useEffect(() => {
     getSupplies().then(setAvailableSupplies).catch(console.error);
     getCatalogItems().then(setCatalogItems).catch(console.error);
+    getActivePartners().then(setPartners).catch(console.error);
   }, []);
 
   const handleGcodeData = useCallback((data: GcodeData) => {
@@ -269,6 +274,7 @@ export default function CalculatorPage() {
     setOrderClientName("");
     setSelectedSupplies({});
     setExtraLineItems([]);
+    setOrderPartnerId("");
     setOrderSalePrice(result.suggestedPrice.toFixed(2));
     setOrderDialogOpen(true);
   }
@@ -322,6 +328,14 @@ export default function CalculatorPage() {
       const allItems = [lineItem, ...extraLinesPayload];
       const pieceNameDisplay = orderPieceName.trim() + (extraLineItems.length > 0 ? ` (+${extraLineItems.length} unid)` : "");
 
+      // Comissão do parceiro
+      const selectedPartner = partners.find((p) => p.id === orderPartnerId);
+      const grossProfit = salePrice - totalCostWithSupplies;
+      const partnerCommission =
+        selectedPartner && grossProfit > 0
+          ? (grossProfit * selectedPartner.commission_percentage) / 100
+          : 0;
+
       await addOrder({
         instagram_handle: orderClientName.trim(),
         cliente_nome: orderClientName.trim(),
@@ -341,6 +355,14 @@ export default function CalculatorPage() {
         custo_operacional_total: totalCostWithSupplies,
         ...(suppliesCostTotal > 0 ? { supplies_cost: suppliesCostTotal } : {}),
         ...(suppliesList.length > 0 ? { supplies: suppliesList } : {}),
+        ...(selectedPartner
+          ? {
+              partner_id: selectedPartner.id,
+              partner_name: selectedPartner.name,
+              partner_commission_value: partnerCommission,
+              partner_commission_paid: false,
+            }
+          : {}),
       });
 
       setOrderSuccess(true);
@@ -763,6 +785,42 @@ export default function CalculatorPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Parceiro indicador */}
+          {partners.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Users className="w-4 h-4" /> Indicado por (Parceiro)
+              </Label>
+              <Select
+                value={orderPartnerId}
+                onValueChange={(v) => setOrderPartnerId(v ?? "")}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Nenhum parceiro (venda direta)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Nenhum parceiro</SelectItem>
+                  {partners.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} ({p.commission_percentage}%)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {orderPartnerId && (() => {
+                const p = partners.find((x) => x.id === orderPartnerId);
+                const gp = (parseFloat(orderSalePrice) || 0) - totalCostWithSupplies;
+                const comm = p && gp > 0 ? (gp * p.commission_percentage) / 100 : 0;
+                return p ? (
+                  <div className="flex items-center justify-between rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Comissão de {p.name}</span>
+                    <span className="font-bold text-primary tabular-nums">{formatBRL(comm)}</span>
+                  </div>
+                ) : null;
+              })()}
             </div>
           )}
 

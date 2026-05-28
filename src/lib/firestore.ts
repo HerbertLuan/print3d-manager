@@ -13,7 +13,6 @@ import {
   runTransaction,
   where,
   limit,
-  Timestamp,
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { deleteImageFromUrl } from "./storage";
@@ -28,6 +27,7 @@ import {
   Collection, NewCollection,
   Coupon, NewCoupon,
   StoreSettings,
+  Partner, NewPartner,
 } from "./types";
 
 // =====================================================
@@ -562,4 +562,122 @@ export async function updateStoreSettings(
   data: Partial<StoreSettings>
 ): Promise<void> {
   await setDoc(SETTINGS_DOC, data, { merge: true });
+}
+
+// =====================================================
+// PARTNER OPERATIONS (Sistema de Parceiros)
+// =====================================================
+
+export async function getPartners(): Promise<Partner[]> {
+  const q = query(collection(db, "partners"), orderBy("name", "asc"));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as Partner[];
+}
+
+export async function getActivePartners(): Promise<Partner[]> {
+  // Não usa orderBy junto com where para evitar exigência de índice composto no Firestore.
+  // Filtragem e ordenação feitas em memória.
+  const snapshot = await getDocs(collection(db, "partners"));
+  return snapshot.docs
+    .map((d) => ({ id: d.id, ...d.data() }) as Partner)
+    .filter((p) => p.active)
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+}
+
+export async function getPartnerByEmail(email: string): Promise<Partner | null> {
+  const q = query(
+    collection(db, "partners"),
+    where("email", "==", email.toLowerCase().trim()),
+    where("active", "==", true),
+    limit(1)
+  );
+  const snapshot = await getDocs(q);
+  if (snapshot.empty) return null;
+  const d = snapshot.docs[0];
+  return { id: d.id, ...d.data() } as Partner;
+}
+
+export async function addPartner(
+  partner: Omit<NewPartner, "created_at">
+): Promise<string> {
+  const docRef = await addDoc(collection(db, "partners"), {
+    ...partner,
+    email: partner.email.toLowerCase().trim(),
+    created_at: serverTimestamp(),
+  });
+  return docRef.id;
+}
+
+export async function updatePartner(
+  id: string,
+  data: Partial<Omit<Partner, "id" | "created_at">>
+): Promise<void> {
+  await updateDoc(doc(db, "partners", id), data);
+}
+
+export async function deletePartner(id: string): Promise<void> {
+  await deleteDoc(doc(db, "partners", id));
+}
+
+/**
+ * Busca todos os pedidos vinculados a um parceiro específico.
+ * Filtra por partner_id usando a query do Firestore.
+ */
+export async function getOrdersByPartner(partnerId: string): Promise<Order[]> {
+  // Evita índice composto (where + orderBy) — filtra e ordena em memória.
+  const q = query(
+    collection(db, "orders"),
+    where("partner_id", "==", partnerId)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs
+    .map((d) => ({ id: d.id, ...d.data() }) as Order)
+    .sort((a, b) => {
+      const ta = a.created_at?.toMillis?.() ?? 0;
+      const tb = b.created_at?.toMillis?.() ?? 0;
+      return tb - ta; // desc
+    });
+}
+
+/**
+ * Busca pedidos de um parceiro dentro de um mês específico.
+ * Usado pelo portal do parceiro para o resumo mensal.
+ */
+export async function getOrdersByPartnerAndMonth(
+  partnerId: string,
+  year: number,
+  month: number
+): Promise<Order[]> {
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 1);
+  // Evita índice composto — filtra as datas em memória após buscar por partner_id.
+  const q = query(
+    collection(db, "orders"),
+    where("partner_id", "==", partnerId)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.docs
+    .map((d) => ({ id: d.id, ...d.data() }) as Order)
+    .filter((o) => {
+      const d = o.created_at?.toDate?.();
+      if (!d) return false;
+      return d >= startDate && d < endDate;
+    })
+    .sort((a, b) => {
+      const ta = a.created_at?.toMillis?.() ?? 0;
+      const tb = b.created_at?.toMillis?.() ?? 0;
+      return tb - ta; // desc
+    });
+}
+
+/**
+ * Marca a comissão de um pedido como paga (ou pendente).
+ */
+export async function updatePartnerCommissionStatus(
+  orderId: string,
+  paid: boolean
+): Promise<void> {
+  await updateDoc(doc(db, "orders", orderId), {
+    partner_commission_paid: paid,
+  });
 }

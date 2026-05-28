@@ -10,9 +10,10 @@ import {
 import { useRouter, usePathname } from "next/navigation";
 import { onAuthStateChanged, signOut as firebaseSignOut, User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { getPartnerByEmail } from "@/lib/firestore";
 
 // ─── Rotas públicas — não requerem autenticação ──────────────────────────────
-const PUBLIC_ROUTES = ["/store", "/login"];
+const PUBLIC_ROUTES = ["/store", "/login", "/parceiro"];
 
 function isPublicRoute(pathname: string): boolean {
   return PUBLIC_ROUTES.some((r) => pathname === r || pathname.startsWith(r + "/"));
@@ -52,16 +53,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      const isPublic = isPublicRoute(pathname);
+
+      if (!firebaseUser) {
+        setUser(null);
+        setLoading(false);
+        if (!isPublic) {
+          router.replace("/login");
+        }
+        return;
+      }
+
+      // ── Guarda: impede parceiros de acessar o painel admin ──────────────
+      // Rotas /parceiro/* são públicas e gerenciadas pelo PartnerAuthProvider.
+      // Se um parceiro tentar acessar uma rota admin, redirecionamos para o portal.
+      if (!isPublic) {
+        try {
+          const partnerRecord = await getPartnerByEmail(firebaseUser.email ?? "");
+          if (partnerRecord) {
+            // É um parceiro — não tem acesso ao admin
+            await firebaseSignOut(auth);
+            setUser(null);
+            setLoading(false);
+            router.replace("/parceiro/login?reason=partner");
+            return;
+          }
+        } catch {
+          // Se a query falhar, deixa passar (fail open para não bloquear o admin real)
+        }
+      }
+
       setUser(firebaseUser);
       setLoading(false);
 
-      const isPublic = isPublicRoute(pathname);
-
-      if (!firebaseUser && !isPublic) {
-        // Não autenticado tentando acessar rota protegida → login
-        router.replace("/login");
-      } else if (firebaseUser && pathname === "/login") {
+      if (firebaseUser && pathname === "/login") {
         // Já autenticado tentando acessar /login → dashboard
         router.replace("/dashboard");
       }

@@ -16,6 +16,7 @@ import {
   InboxIcon,
   ShoppingCart,
   Hash,
+  Users,
 } from "lucide-react";
 import {
   Card,
@@ -52,8 +53,9 @@ import {
   updateOrderPaymentStatus,
   deleteOrder,
   updateOrder,
+  getActivePartners,
 } from "@/lib/firestore";
-import { Order, PaymentStatus, ProductionStatus, CartItem } from "@/lib/types";
+import { Order, PaymentStatus, ProductionStatus, CartItem, Partner } from "@/lib/types";
 import { formatBRL, formatTime, calculateBatchTimeAndCost, DEFAULT_PROFIT_MARGIN, FILAMENT_COST_PER_KG } from "@/lib/calculations";
 
 // ─── Configuração das colunas Kanban ─────────────────────────────────────────
@@ -140,10 +142,14 @@ export default function OrdersPage() {
   const [deleteOrderData, setDeleteOrderData] = useState<Order | null>(null);
   const [infoOrder, setInfoOrder] = useState<Order | null>(null);
 
+  // ── Partners ──
+  const [partners, setPartners] = useState<Partner[]>([]);
+
   // ── Approval modal state (pending_approval) ──
   const [approvalOrder, setApprovalOrder] = useState<Order | null>(null);
   const [approvalPrice, setApprovalPrice] = useState("");
   const [approvalClientName, setApprovalClientName] = useState("");
+  const [approvalPartnerId, setApprovalPartnerId] = useState("");
   const [savingApproval, setSavingApproval] = useState(false);
 
   // ── Edit state ──
@@ -166,7 +172,10 @@ export default function OrdersPage() {
     }
   }, []);
 
-  useEffect(() => { loadOrders(); }, [loadOrders]);
+  useEffect(() => {
+    loadOrders();
+    getActivePartners().then(setPartners).catch(console.error);
+  }, [loadOrders]);
 
   const filteredOrders = useMemo(() => {
     if (!searchQuery.trim()) return orders;
@@ -228,6 +237,7 @@ export default function OrdersPage() {
   function openApprovalModal(order: Order) {
     setApprovalOrder(order);
     setApprovalClientName(order.cliente_nome || "");
+    setApprovalPartnerId(order.partner_id || "");
     // Usa valor_total do pedido do site como preço inicial
     const initialPrice = (order as any).valor_total ?? order.price ?? 0;
     setApprovalPrice(initialPrice.toFixed(2));
@@ -253,6 +263,15 @@ export default function OrdersPage() {
         }
       }
 
+      // ── Cálculo da comissão do parceiro ──
+      const totalCostEstimate = totalFilament + totalMachine;
+      const grossProfit = price - totalCostEstimate;
+      const selectedPartner = partners.find((p) => p.id === approvalPartnerId);
+      const partnerCommission =
+        selectedPartner && grossProfit > 0
+          ? (grossProfit * selectedPartner.commission_percentage) / 100
+          : 0;
+
       const updatePayload: Partial<Order> = {
         production_status: "Na Fila",
         price,
@@ -263,6 +282,15 @@ export default function OrdersPage() {
         batch_time_minutes: totalBatchTime,
         custo_operacional_total: totalFilament + totalMachine,
         base_cost: totalFilament + totalMachine,
+        // Parceiro (opcional) — omitidos quando não há parceiro para evitar undefined no Firestore
+        ...(selectedPartner
+          ? {
+              partner_id: selectedPartner.id,
+              partner_name: selectedPartner.name,
+              partner_commission_value: partnerCommission,
+              partner_commission_paid: false,
+            }
+          : {}),
       };
 
       await updateOrder(approvalOrder.id, updatePayload);
@@ -339,6 +367,15 @@ export default function OrdersPage() {
     const margin = price > 0 ? ((price - totalCost) / price) * 100 : 0;
     return { totalFilament, totalMachine, totalTime, totalSaved, totalCost, margin };
   }, [approvalOrder, approvalPrice]);
+
+  // Calcula comissão do parceiro selecionado
+  const approvalPartnerCommission = useMemo(() => {
+    const partner = partners.find((p) => p.id === approvalPartnerId);
+    if (!partner || !approvalStats) return null;
+    const grossProfit = (parseFloat(approvalPrice) || 0) - approvalStats.totalCost;
+    const commission = grossProfit > 0 ? (grossProfit * partner.commission_percentage) / 100 : 0;
+    return { partner, commission };
+  }, [approvalPartnerId, approvalStats, approvalPrice, partners]);
 
   return (
     <div className="flex-1 p-4 md:p-6 overflow-x-auto">
@@ -537,6 +574,41 @@ export default function OrdersPage() {
               )}
             </div>
 
+            {/* Parceiro indicador */}
+            {partners.length > 0 && (
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Users className="w-4 h-4" /> Indicado por (Parceiro)
+                </Label>
+                <Select
+                  value={approvalPartnerId}
+                  onValueChange={(v) => setApprovalPartnerId(v ?? "")}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Nenhum parceiro (venda direta)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Nenhum parceiro</SelectItem>
+                    {partners.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name} ({p.commission_percentage}%)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {approvalPartnerCommission && (
+                  <div className="flex items-center justify-between rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">
+                      Comissão de {approvalPartnerCommission.partner.name}
+                    </span>
+                    <span className="font-bold text-primary tabular-nums">
+                      {formatBRL(approvalPartnerCommission.commission)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex flex-col-reverse sm:flex-row gap-2 pt-2">
               <Button variant="outline" className="flex-1" onClick={() => setApprovalOrder(null)} disabled={savingApproval}>
                 Cancelar
@@ -692,6 +764,12 @@ function OrderCard({
 
           <p className="font-semibold text-foreground leading-tight truncate">{order.piece_name}</p>
           <p className="text-xs text-muted-foreground mt-0.5">{clientLabel} · {qty}x</p>
+          {order.partner_name && (
+            <p className="text-[10px] mt-0.5 flex items-center gap-1 text-violet-400">
+              <Users className="w-3 h-3 shrink-0" />
+              Parceiro: {order.partner_name}
+            </p>
+          )}
         </div>
 
         {/* Dropdown */}
@@ -886,6 +964,35 @@ function OrderInfoContent({ order }: { order: Order }) {
           {order.supplies.map((s, i) => (
             <p key={i}>• {s.name} × {s.quantity} — {formatBRL(s.unit_cost * s.quantity)}</p>
           ))}
+        </div>
+      )}
+
+      {/* ── Comissão do Parceiro ── */}
+      {order.partner_name && (
+        <div className={`rounded-lg border p-3 space-y-1.5 text-sm ${
+          order.partner_commission_paid
+            ? "border-emerald-500/20 bg-emerald-500/5"
+            : "border-violet-500/20 bg-violet-500/5"
+        }`}>
+          <p className="text-xs font-semibold uppercase tracking-widest text-violet-400 flex items-center gap-1.5">
+            <Users className="w-3.5 h-3.5" /> Comissão do Parceiro
+          </p>
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">{order.partner_name}</span>
+            <span className="font-bold text-violet-400 tabular-nums">
+              {formatBRL(order.partner_commission_value ?? 0)}
+            </span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">Status</span>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${
+              order.partner_commission_paid
+                ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+                : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+            }`}>
+              {order.partner_commission_paid ? "Pago" : "Pendente"}
+            </span>
+          </div>
         </div>
       )}
     </div>

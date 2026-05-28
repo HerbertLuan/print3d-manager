@@ -1,6 +1,27 @@
 import { Timestamp } from "firebase/firestore";
 
 // =====================================================
+// PARTNER TYPES (Sistema de Parceiros / Afiliados)
+// =====================================================
+
+export interface Partner {
+  id: string;
+  /** Nome completo do parceiro */
+  name: string;
+  /** E-mail usado para login no portal do parceiro */
+  email: string;
+  /** Percentual de comissão sobre o lucro bruto (ex: 10 → 10%) */
+  commission_percentage: number;
+  /** Chave PIX para facilitar o pagamento */
+  pix_key?: string;
+  /** Se false, não aparece na lista de seleção dos pedidos */
+  active: boolean;
+  created_at: Timestamp;
+}
+
+export type NewPartner = Omit<Partner, "id">;
+
+// =====================================================
 // PROMOTIONS TYPES (Cupons e Configurações da Loja)
 // =====================================================
 
@@ -246,6 +267,14 @@ export interface Order {
   coupon_code?: string;
   /** Valor total de desconto concedido (R$) */
   discount_amount?: number;
+  /** ID do parceiro que indicou este pedido */
+  partner_id?: string;
+  /** Nome do parceiro (snapshot no momento do aceite) */
+  partner_name?: string;
+  /** Valor da comissão em R$ (calculado no momento do aceite e congelado) */
+  partner_commission_value?: number;
+  /** Controle se a comissão já foi paga ao parceiro */
+  partner_commission_paid?: boolean;
   created_at: Timestamp;
 }
 

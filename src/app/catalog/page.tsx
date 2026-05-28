@@ -21,6 +21,7 @@ import {
   ToggleLeft,
   Star,
   GripVertical,
+  Users,
 } from "lucide-react";
 import {
   Card,
@@ -64,8 +65,9 @@ import {
   addCollection,
   updateCollection,
   deleteCollection,
+  getActivePartners,
 } from "@/lib/firestore";
-import { CatalogItem, Supply, SelectedSupply, Collection } from "@/lib/types";
+import { CatalogItem, Supply, SelectedSupply, Collection, Partner } from "@/lib/types";
 import {
   formatBRL,
   formatTime,
@@ -128,6 +130,10 @@ export default function CatalogPage() {
   const [selectedSupplies, setSelectedSupplies] = useState<Record<string, number>>({});
   const [ordering, setOrdering] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
+  const [orderPartnerId, setOrderPartnerId] = useState("");
+
+  // ── Parceiros ──
+  const [partners, setPartners] = useState<Partner[]>([]);
 
   // Carrinho interno
   const [orderLineItems, setOrderLineItems] = useState<{
@@ -188,7 +194,10 @@ export default function CatalogPage() {
     }
   }, []);
 
-  useEffect(() => { loadAll(); }, [loadAll]);
+  useEffect(() => {
+    loadAll();
+    getActivePartners().then(setPartners).catch(console.error);
+  }, [loadAll]);
 
   // Restaura a aba ativa do catálogo do localStorage (QoL)
   useEffect(() => {
@@ -263,6 +272,7 @@ export default function CatalogPage() {
     setSelectedSupplies({});
     setClientName("");
     setOrderPrice("");
+    setOrderPartnerId("");
     setOrderDialogOpen(true);
   }
 
@@ -384,6 +394,14 @@ export default function CatalogPage() {
         .map((l) => `${l.qty}× ${l.item.name}`)
         .join(", ");
 
+      // Comissão do parceiro
+      const selectedPartner = partners.find((p) => p.id === orderPartnerId);
+      const grossProfit = salePrice - (totalBatchStats?.totalCostWithSupplies ?? 0);
+      const partnerCommission =
+        selectedPartner && grossProfit > 0
+          ? (grossProfit * selectedPartner.commission_percentage) / 100
+          : 0;
+
       const orderPayload: Parameters<typeof addOrder>[0] = {
         instagram_handle: clientName.trim(),
         cliente_nome: clientName.trim(),
@@ -408,6 +426,14 @@ export default function CatalogPage() {
           ? { supplies_cost: totalBatchStats.suppliesCostTotal }
           : {}),
         ...(suppliesList.length > 0 ? { supplies: suppliesList } : {}),
+        ...(selectedPartner
+          ? {
+              partner_id: selectedPartner.id,
+              partner_name: selectedPartner.name,
+              partner_commission_value: partnerCommission,
+              partner_commission_paid: false,
+            }
+          : {}),
       };
 
       await addOrder(orderPayload);
@@ -1070,6 +1096,42 @@ export default function CatalogPage() {
               </p>
             )}
           </div>
+
+          {/* Parceiro indicador */}
+          {partners.length > 0 && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Users className="w-4 h-4" /> Indicado por (Parceiro)
+              </Label>
+              <Select
+                value={orderPartnerId}
+                onValueChange={(v) => setOrderPartnerId(v ?? "")}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Nenhum parceiro (venda direta)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Nenhum parceiro</SelectItem>
+                  {partners.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name} ({p.commission_percentage}%)
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {orderPartnerId && totalBatchStats && (() => {
+                const p = partners.find((x) => x.id === orderPartnerId);
+                const gp = (parseFloat(orderPrice) || 0) - totalBatchStats.totalCostWithSupplies;
+                const comm = p && gp > 0 ? (gp * p.commission_percentage) / 100 : 0;
+                return p ? (
+                  <div className="flex items-center justify-between rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Comissão de {p.name}</span>
+                    <span className="font-bold text-primary tabular-nums">{formatBRL(comm)}</span>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+          )}
 
           <div className="flex flex-col-reverse sm:flex-row gap-2">
             <Button

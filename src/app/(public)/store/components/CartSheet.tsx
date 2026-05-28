@@ -224,8 +224,8 @@ export function CartSheet() {
         cliente_telefone: "Aguardando WhatsApp",
         cart_items: items,
         valor_total: total,
-        coupon_code: appliedCoupon?.code,
-        discount_amount: discountValue > 0 ? discountValue : undefined,
+        ...(appliedCoupon?.code ? { coupon_code: appliedCoupon.code } : {}),
+        ...(discountValue > 0 ? { discount_amount: discountValue } : {}),
         origem: "site",
         production_status: "pending_approval",
         payment_status: "Pendente",
@@ -258,8 +258,8 @@ export function CartSheet() {
       );
 
       window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${msg}`, "_blank");
-    } catch (err) {
-      console.error("Erro ao criar pedido:", err);
+    } catch (err: any) {
+      console.error("Erro ao criar pedido — código:", err?.code, "| mensagem:", err?.message, "| full:", err);
       setError("Não foi possível registrar o pedido. Tente novamente.");
     } finally {
       setLoading(false);
